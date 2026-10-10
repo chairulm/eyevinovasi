@@ -10,6 +10,12 @@
 
   const state = { detail: null, cams: [], api: false, src: new Set(), cat: new Set(), play: new Set(), q: "", markers: new Map(), tiles: [] };
   const $ = (s) => document.querySelector(s);
+  // same-origin API call: CSRF header on writes, back to the login page when the session ends
+  async function api(url, opts = {}) {
+    const r = await fetch(url, { cache: "no-store", ...opts, headers: { "X-Eye": "1", ...(opts.headers || {}) } });
+    if (r.status === 401) { location.href = "/login?next=" + encodeURIComponent(location.pathname + location.search); throw new Error("login required"); }
+    return r;
+  }
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
   // ---------- map
@@ -34,7 +40,7 @@
   async function load() {
     let gj;
     try {
-      const r = await fetch("/api/v1/cameras", { cache: "no-store" });
+      const r = await api("/api/v1/cameras");
       if (!r.ok) throw 0;
       gj = await r.json(); state.api = true;
     } catch {
@@ -45,7 +51,28 @@
     render();
     const pts = state.cams.filter((c) => c.lat != null).map((c) => [c.lat, c.lon]);
     if (pts.length) map.fitBounds(pts, { padding: [30, 30] });
-    $("#refresh").style.display = state.api ? "" : "none";
+    await loadMe();
+    const h = location.hash.match(/^#cam=(.+)$/);           // deep link: /#cam=<id>
+    const hc = h && state.cams.find((c) => c.id === decodeURIComponent(h[1]));
+    if (hc) { if (hc.lat != null) map.setView([hc.lat, hc.lon], 16); openDetail(hc, "info"); }
+  }
+
+  async function loadMe() {
+    $("#refresh").style.display = "none";
+    if (!state.api) return;
+    try {
+      const me = await (await api("/api/v1/auth/me")).json();
+      state.me = me;
+      const admin = me.role === "admin";
+      $("#refresh").style.display = admin ? "" : "none";
+      if (!me.auth) return;
+      const u = $("#user");
+      u.innerHTML = `<span class="who" title="${esc(me.role)}">${esc(me.username)}</span>
+        ${admin ? `<a class="btn mini" href="/admin">Admin</a>` : ""}
+        <button class="mini" id="logout">Log out</button>`;
+      u.hidden = false;
+      $("#logout").onclick = async () => { await api("/api/v1/auth/logout", { method: "POST" }).catch(() => {}); location.href = "/login"; };
+    } catch {}
   }
 
   function counts(key) {
@@ -182,7 +209,7 @@
     } else if (c.playback === "resolve") {
       const m = msg("Resolving fresh player URL…");
       if (!state.api) { m.innerHTML = `Needs the server (token is short-lived).${srcLink}`; return handle; }
-      fetch("/api/v1/resolve/" + encodeURIComponent(c.id))
+      api("/api/v1/resolve/" + encodeURIComponent(c.id))
         .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
         .then(({ url }) => {
           const f = document.createElement("iframe"); f.src = url; f.allow = "autoplay; fullscreen"; f.referrerPolicy = "no-referrer";
@@ -243,7 +270,7 @@
     $("#d-status").className = "pill " + c.status; $("#d-status").textContent = c.status;
     showTab(tab);
     if (state.api) {
-      fetch("/api/v1/cameras/" + encodeURIComponent(c.id) + "?history=30").then((r) => r.ok ? r.json() : null).then((data) => {
+      api("/api/v1/cameras/" + encodeURIComponent(c.id) + "?history=30").then((r) => r.ok ? r.json() : null).then((data) => {
         if (!state.detail || state.detail.cam.id !== c.id || !data) return;
         state.detail.data = data;
         if (state.detail.tab === "info") renderInfo();
@@ -287,7 +314,7 @@
     const st = state.detail, body = $("#d-body");
     if (!state.api) { body.innerHTML = `<p class="hint">History needs the server database.</p>`; return; }
     body.innerHTML = `<div class="hint">Loading…</div>`;
-    fetch("/api/v1/cameras/" + encodeURIComponent(st.cam.id) + "/uptime?days=7").then((r) => r.json()).then((u) => {
+    api("/api/v1/cameras/" + encodeURIComponent(st.cam.id) + "/uptime?days=7").then((r) => r.json()).then((u) => {
       if (!state.detail || state.detail.cam.id !== st.cam.id || state.detail.tab !== "history") return;
       const t0 = new Date(u.window_start).getTime(), t1 = Date.now(), span = t1 - t0;
       const bars = u.segments.map((s) => {
@@ -315,15 +342,17 @@
       ${row("Source", esc(SRC[c.source]?.label || c.source))}
       ${row("Category", esc(c.meta?.category_label || c.category))}
       ${row("Area", esc([c.area, c.city].filter((x, i, a) => x && a.indexOf(x) === i).join(" · ")))}
-      ${row("Location", c.lat != null ? `${c.lat.toFixed(5)}, ${c.lon.toFixed(5)}${c.geo_source === "approx" ? ' <span class="tag approx">approx.</span>' : ""}` : "unknown")}
+      ${row("Location", c.lat != null ? `${c.lat.toFixed(5)}, ${c.lon.toFixed(5)}${c.geo_source === "approx" ? ' <span class="tag approx">approx.</span>' : c.geo_source === "manual" ? ' <span class="tag manual">corrected</span>' : ""}` : "unknown")}
       ${row("Playback", esc(c.playback) + (c.analytics_ready ? " · analytics-ready" : ""))}
       ${row("Status", `${esc(c.status)} · checked ${fmtTime(c.last_checked)}`)}
       ${row("First seen", fmtTime(c.first_seen))}
       ${row("Last seen", fmtTime(c.last_seen))}
       ${row("Source page", link(c.page_url))}
+      ${c.overridden ? row("Admin note", esc(c.override_note || "") + `<span class="hint"> — ${esc(c.override_by || "")}, ${fmtTime(c.override_at)}</span>`) : ""}
     </table>
     ${c.lat != null ? `<div class="d-actions"><button id="d-zoom">⌖ Zoom to camera</button>
-      <a class="btn" target="_blank" rel="noopener" href="https://www.google.com/maps?q=${c.lat},${c.lon}">Google Maps ↗</a></div>` : ""}`;
+      <a class="btn" target="_blank" rel="noopener" href="https://www.google.com/maps?q=${c.lat},${c.lon}">Google Maps ↗</a></div>` : ""}
+    ${state.me?.role === "admin" && state.me?.auth ? `<div class="d-actions"><a class="btn" href="/admin#cameras=${encodeURIComponent(c.id)}">✎ Edit camera (admin)</a></div>` : ""}`;
     const cp = $("#d-copy"); if (cp) cp.onclick = () => navigator.clipboard?.writeText(c.id).then(() => (cp.textContent = "copied"));
     const z = $("#d-zoom"); if (z) z.onclick = () => map.setView([c.lat, c.lon], 17);
   }
@@ -337,7 +366,7 @@
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDetail(); });
   $("#refresh").onclick = async (e) => {
     e.target.disabled = true; e.target.textContent = "Refreshing…";
-    try { await fetch("/api/v1/refresh", { method: "POST" }); setTimeout(() => location.reload(), 45000); }
+    try { await api("/api/v1/refresh", { method: "POST" }); setTimeout(() => location.reload(), 45000); }
     catch { e.target.disabled = false; e.target.textContent = "Refresh"; }
   };
 

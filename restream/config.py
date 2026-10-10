@@ -121,7 +121,7 @@ def write(cams: list[dict], path: Path = CONFIG) -> bool:
 def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     from db.store import get_store
-    cams = get_store().list_cameras()
+    cams = get_store().list_cameras(include_hidden=True, raw=True)
     changed = write(cams)
     print(f"{CONFIG}: {sum(1 for c in cams if c.get('playback') == 'hls' and c.get('stream_url'))} "
           f"paths ({'updated' if changed else 'unchanged'})")

@@ -78,7 +78,8 @@ class JsonStore:
         return [_with_ready({k: r.get(k) for k in FIELDS} | {"active": True})
                 for r in json.loads(self.path.read_text())]
 
-    def list_cameras(self, source=None, status=None, bbox=None, include_inactive=False):
+    def list_cameras(self, source=None, status=None, bbox=None, include_inactive=False,
+                     include_hidden=False, raw=False):
         return [c for c in self._all()
                 if (not source or c["source"] in source)
                 and (not status or c["status"] in status)
@@ -132,29 +133,53 @@ class PgStore(JsonStore):
             pass
 
     # ---- reads
-    def list_cameras(self, source=None, status=None, bbox=None, include_inactive=False):
+    # Effective values = scraped values with admin overrides (camera_overrides) applied.
+    # raw=True returns the scraped values only (used by the collector/health/re-stream so
+    # overrides never get written back into the cameras table).
+    _EFFECTIVE = {
+        "name": "COALESCE(o.name, c.name)",
+        "lat": "COALESCE(o.lat, c.lat)",
+        "lon": "COALESCE(o.lon, c.lon)",
+        "geo_source": "CASE WHEN o.lat IS NOT NULL THEN 'manual' ELSE c.geo_source END",
+    }
+
+    def _select(self, raw: bool) -> str:
+        cols = [f"c.{f}" if raw or f not in self._EFFECTIVE else f"{self._EFFECTIVE[f]} AS {f}"
+                for f in FIELDS]
+        cols += ["c.active", "COALESCE(o.hidden, false) AS hidden",
+                 "(o.camera_id IS NOT NULL) AS overridden"]
+        return f"SELECT {', '.join(cols)} FROM cameras c LEFT JOIN camera_overrides o ON o.camera_id = c.id"
+
+    def list_cameras(self, source=None, status=None, bbox=None, include_inactive=False,
+                     include_hidden=False, raw=False):
         where, args = [], []
         if not include_inactive:
-            where.append("active")
+            where.append("c.active")
+        if not include_hidden:
+            where.append("NOT COALESCE(o.hidden, false)")
         if source:
-            where.append("source = ANY(%s)"); args.append(list(source))
+            where.append("c.source = ANY(%s)"); args.append(list(source))
         if status:
-            where.append("status = ANY(%s)"); args.append(list(status))
+            where.append("c.status = ANY(%s)"); args.append(list(status))
         if bbox:
             w, s, e, n = bbox
-            where.append("lat BETWEEN %s AND %s AND lon BETWEEN %s AND %s"); args += [s, n, w, e]
-        sql = f"SELECT {', '.join(FIELDS)}, active FROM cameras"
+            lat, lon = ("c.lat", "c.lon") if raw else (self._EFFECTIVE["lat"], self._EFFECTIVE["lon"])
+            where.append(f"{lat} BETWEEN %s AND %s AND {lon} BETWEEN %s AND %s"); args += [s, n, w, e]
+        sql = self._select(raw)
         if where:
             sql += " WHERE " + " AND ".join(where)
-        sql += " ORDER BY source, id"
+        sql += " ORDER BY c.source, c.id"
         with self.pool.connection() as c:
             rows = c.execute(sql, args).fetchall()
         return [_with_ready(self._iso(r)) for r in rows]
 
     def get_camera(self, cam_id):
         with self.pool.connection() as c:
-            r = c.execute(f"SELECT {', '.join(FIELDS)}, active, first_seen, last_seen "
-                          "FROM cameras WHERE id = %s", (cam_id,)).fetchone()
+            r = c.execute(self._select(False).replace(" FROM cameras c", ", c.first_seen, c.last_seen, "
+                          "c.name AS source_name, c.lat AS source_lat, c.lon AS source_lon, "
+                          "o.note AS override_note, o.updated_by AS override_by, "
+                          "o.updated_at AS override_at FROM cameras c")
+                          + " WHERE c.id = %s", (cam_id,)).fetchone()
         return _with_ready(self._iso(r)) if r else None
 
     def status_log(self, cam_id, limit=100):
@@ -187,7 +212,8 @@ class PgStore(JsonStore):
             rows = c.execute(
                 "SELECT source, status, count(*) AS n, "
                 "count(*) FILTER (WHERE playback = 'hls' AND stream_url IS NOT NULL) AS ready "
-                "FROM cameras WHERE active GROUP BY source, status").fetchall()
+                "FROM cameras c LEFT JOIN camera_overrides o ON o.camera_id = c.id "
+                "WHERE c.active AND NOT COALESCE(o.hidden, false) GROUP BY source, status").fetchall()
         out = {"total": 0, "by_source": {}, "by_status": {}, "analytics_ready": 0}
         for r in rows:
             out["total"] += r["n"]
@@ -291,7 +317,7 @@ def get_store():
 def cameras_from_store(store) -> list[Camera]:
     """Current active cameras as Camera objects (for health checks)."""
     out = []
-    for d in store.list_cameras():
+    for d in store.list_cameras(include_hidden=True, raw=True):
         d = {k: d[k] for k in FIELDS}
         out.append(Camera(**d))
     return out

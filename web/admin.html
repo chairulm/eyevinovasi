@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Admin · Eyevinovasi CCTV Map</title>
+<style>
+  :root { --bg:#f6f7f9; --panel:#fff; --ink:#14171c; --muted:#66707d; --line:#e3e6eb; --accent:#2563eb; --ok:#16a34a; --bad:#dc2626; --warn:#d97706;
+          font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 14px; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0f1216; --panel:#161a20; --ink:#e7eaee; --muted:#95a0ad; --line:#262c35; } }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); }
+  header.top { display: flex; align-items: center; gap: 12px; padding: 12px 20px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .brand { font-weight: 700; font-size: 16px; display: flex; gap: 8px; align-items: center; }
+  .brand small { font-weight: 500; color: var(--muted); }
+  header.top .sp { flex: 1; }
+  nav.tabs { display: flex; gap: 4px; padding: 0 20px; background: var(--panel); border-bottom: 1px solid var(--line); overflow-x: auto; }
+  nav.tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; padding: 10px 12px; background: none; color: var(--muted); white-space: nowrap; }
+  nav.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+  main { padding: 18px 20px 40px; max-width: 1200px; margin: 0 auto; }
+  section[hidden] { display: none; }
+  h2 { font-size: 15px; margin: 22px 0 10px; } h2:first-child { margin-top: 0; }
+  button, .btn { font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 6px 11px; text-decoration: none; display: inline-block; }
+  button:hover, .btn:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.danger { color: var(--bad); }
+  button.sm { font-size: 12px; padding: 3px 8px; }
+  button:disabled { opacity: .5; cursor: default; }
+  input, select, textarea { font: inherit; padding: 7px 9px; border-radius: 7px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; }
+  .row label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+  .scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  th { font-size: 12px; color: var(--muted); font-weight: 600; background: var(--bg); white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  td.num { font-variant-numeric: tabular-nums; text-align: right; }
+  .muted { color: var(--muted); } .small { font-size: 12px; }
+  .pill { font-size: 11.5px; padding: 2px 8px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); white-space: nowrap; }
+  .pill.ok { color: var(--ok); } .pill.bad { color: var(--bad); } .pill.warn { color: var(--warn); }
+  code { font-size: 12px; }
+  .msg { min-height: 1.3em; margin: 8px 0 0; font-size: 13px; } .msg.err { color: var(--bad); } .msg.ok { color: var(--ok); }
+  .split { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(300px, 1.2fr); gap: 16px; align-items: start; }
+  @media (max-width: 800px) { .split { grid-template-columns: 1fr; } main { padding: 14px 12px 40px; } }
+  #cam-results { max-height: 420px; overflow: auto; margin-top: 8px; border: 1px solid var(--line); border-radius: 8px; }
+  #cam-results div { padding: 7px 10px; border-bottom: 1px solid var(--line); cursor: pointer; display: flex; gap: 8px; justify-content: space-between; }
+  #cam-results div:hover, #cam-results div.sel { background: var(--bg); }
+  .form { display: grid; gap: 10px; }
+  .form label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+  .form .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .chk { display: flex !important; gap: 8px; align-items: center; color: var(--ink) !important; font-size: 13.5px !important; }
+  .orig { font-size: 12px; color: var(--muted); }
+  details summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+  pre { margin: 4px 0 0; font-size: 11.5px; white-space: pre-wrap; word-break: break-all; }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">CCTV Map <small>· Admin</small></div>
+  <span class="sp"></span>
+  <span class="muted small" id="me"></span>
+  <a class="btn" href="/">← Map</a>
+  <button id="logout">Log out</button>
+</header>
+<nav class="tabs" role="tablist">
+  <button role="tab" data-tab="users" aria-selected="true">Users</button>
+  <button role="tab" data-tab="collector" aria-selected="false">Collector &amp; health</button>
+  <button role="tab" data-tab="cameras" aria-selected="false">Cameras</button>
+  <button role="tab" data-tab="audit" aria-selected="false">Audit log</button>
+</nav>
+<main>
+  <section id="tab-users">
+    <h2>Accounts</h2>
+    <div class="scroll"><table id="users"><thead><tr><th>User</th><th>Role</th><th>Status</th><th>Last login</th><th>Sessions</th><th></th></tr></thead><tbody></tbody></table></div>
+    <h2>Add account</h2>
+    <form class="card row" id="new-user" autocomplete="off">
+      <label>Username <input name="username" required pattern="[a-z0-9._\-]{3,32}" placeholder="lowercase, 3–32" autocapitalize="none"></label>
+      <label>Password <input name="password" type="password" required minlength="10" autocomplete="new-password" placeholder="min 10 chars"></label>
+      <label>Role <select name="role"><option value="viewer">viewer</option><option value="admin">admin</option></select></label>
+      <button class="primary" type="submit">Create</button>
+    </form>
+    <p class="msg" id="users-msg"></p>
+    <p class="muted small">Viewers see the map and live video. Admins also get this page. Changing a role, disabling an account or resetting a password signs that user out.</p>
+  </section>
+
+  <section id="tab-collector" hidden>
+    <div class="row" style="justify-content:space-between"><h2 style="margin:0">Sources</h2>
+      <button id="run-now" class="primary">Re-scrape &amp; re-check now</button></div>
+    <p class="msg" id="col-msg"></p>
+    <div class="scroll"><table id="sources"><thead><tr><th>Source</th><th class="num">Active</th><th class="num">Online</th><th class="num">Offline</th><th class="num">Retired</th><th class="num">Hidden</th><th>Last check</th><th>Last run</th><th>Last live scrape</th></tr></thead><tbody></tbody></table></div>
+    <h2>Recent collector runs</h2>
+    <div class="scroll"><table id="runs"><thead><tr><th>Started</th><th>Source</th><th>Mode</th><th class="num">Cameras</th><th class="num">+ / −</th><th>Duration</th><th>Error</th></tr></thead><tbody></tbody></table></div>
+    <p class="muted small">Mode <b>live</b> = fresh scrape from the portal; <b>seed</b>/<b>fallback</b> = bundled snapshot used because the portal was unreachable (cameras are never retired on those runs).</p>
+  </section>
+
+  <section id="tab-cameras" hidden>
+    <div class="split">
+      <div>
+        <h2>Find a camera</h2>
+        <input id="cam-q" type="search" placeholder="Name, id, area…" style="width:100%">
+        <div id="cam-results"></div>
+        <h2>Current overrides</h2>
+        <div class="scroll"><table id="overrides"><thead><tr><th>Camera</th><th>Change</th><th>By</th></tr></thead><tbody></tbody></table></div>
+      </div>
+      <div>
+        <h2>Edit</h2>
+        <div class="card" id="cam-edit"><p class="muted">Pick a camera on the left (or use “Edit camera” in the map’s Info tab).</p></div>
+        <p class="muted small">Overrides survive every scrape. They change how the camera appears on the map and in the API; the upstream data is kept untouched and shown as “source”.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-audit" hidden>
+    <form class="row" id="audit-filter">
+      <label>Action <select name="action"><option value="">all</option>
+        <option>login</option><option>login_failed</option><option>login_blocked</option><option>logout</option>
+        <option>user_create</option><option>user_update</option><option>user_delete</option>
+        <option>override_set</option><option>override_reset</option><option>refresh</option></select></label>
+      <label>User <input name="username" placeholder="any"></label>
+      <button type="submit">Filter</button>
+    </form>
+    <div class="scroll" style="margin-top:12px"><table id="audit"><thead><tr><th>When</th><th>User</th><th>Action</th><th>Target</th><th>IP</th><th>Detail</th></tr></thead><tbody></tbody></table></div>
+    <div class="row" style="margin-top:10px; justify-content:space-between"><span class="muted small" id="audit-info"></span>
+      <span><button id="audit-prev" class="sm">← Newer</button> <button id="audit-next" class="sm">Older →</button></span></div>
+  </section>
+</main>
+<script src="admin.js"></script>
+</body>
+</html>

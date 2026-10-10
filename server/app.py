@@ -12,7 +12,11 @@ API v1 (also served at the legacy /api/... paths for compatibility)
   GET  /api/v1/stats                   counts per source / status (+ last collector runs)
   GET  /api/v1/health                  backend + database status (for monitoring)
   GET  /api/v1/resolve/{id}            fresh player URL for tokenised sources (Kemenhub)
-  POST /api/v1/refresh                 re-run collectors (+ health) in background
+  POST /api/v1/refresh                 re-run collectors (+ health) in background   [admin]
+  POST /api/v1/auth/login | logout     session cookie;  GET /api/v1/auth/me, /api/v1/auth/check
+  /api/v1/admin/...                    admin API (server/admin.py)                   [admin]
+Auth (Postgres backend only): every page and API needs a session except /login and
+/api/v1/health; non-GET API calls must send the header  X-Eye: 1  (CSRF guard).
 Other
   GET  /hls?u=<url>                    HLS reverse proxy (host allow-list, playlist rewrite)
   GET  /                               map UI (web/)
@@ -29,14 +33,18 @@ from pathlib import Path
 from urllib.parse import quote, urljoin, urlparse
 
 import httpx
-from fastapi import APIRouter, FastAPI, HTTPException, Query
-from fastapi.responses import JSONResponse, Response, StreamingResponse
+from fastapi import APIRouter, FastAPI, HTTPException, Query, Request
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 from collector.common import RESOLVE, UA
 from collector.run import collect, health_only
 from collector.sources import binamarga
 from db.store import get_store
+
+from . import admin, auth
+from .admin import client_ip
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
@@ -58,6 +66,60 @@ app = FastAPI(title="Eyevinovasi CCTV Map", version="1.0")
 api = APIRouter()
 _lock = threading.Lock()
 _http: httpx.AsyncClient | None = None
+
+# ---------------------------------------------------------------- auth gate
+PUBLIC = {"/login", "/login.html", "/favicon.ico",
+          "/api/v1/auth/login", "/api/v1/auth/check", "/api/v1/health",
+          "/api/auth/login", "/api/auth/check", "/api/health"}
+PUBLIC_PREFIX = ("/vendor/",)
+ADMIN_PREFIX = ("/api/v1/admin/", "/api/admin/")
+ADMIN_PATHS = {"/admin", "/admin.html", "/admin.js", "/api/v1/refresh", "/api/refresh"}
+
+
+def _trusted_local(request: Request) -> bool:
+    """GETs made on the server itself (check.sh, curl on the VM) — not via nginx, which
+    always adds X-Forwarded-For/X-Real-IP."""
+    host = request.client.host if request.client else ""
+    return (request.method in ("GET", "HEAD") and host in ("127.0.0.1", "::1")
+            and "x-forwarded-for" not in request.headers and "x-real-ip" not in request.headers)
+
+
+def _deny(request: Request, code: int, msg: str):
+    p = request.url.path
+    if p.startswith(("/api", "/hls", "/live")) or p.endswith(".js"):
+        return JSONResponse({"detail": msg}, status_code=code)
+    if code == 403:
+        return RedirectResponse("/", status_code=302)          # signed in, but not an admin
+    nxt = p + (("?" + request.url.query) if request.url.query else "")
+    return RedirectResponse("/login?next=" + quote(nxt, safe=""), status_code=302)
+
+
+@app.middleware("http")
+async def auth_gate(request: Request, call_next):
+    request.state.user = None
+    if not auth.enabled():
+        return await call_next(request)                  # no database configured: no accounts
+    p = request.url.path
+    if p.startswith("/api") and request.method not in ("GET", "HEAD", "OPTIONS") \
+            and request.headers.get("x-eye") != "1":
+        return JSONResponse({"detail": "missing X-Eye header"}, status_code=403)
+    if p in PUBLIC or p.startswith(PUBLIC_PREFIX):
+        return await call_next(request)
+    try:
+        user = await asyncio.to_thread(auth.session_user, request.cookies.get(auth.COOKIE))
+    except auth.AuthError:
+        user = None
+        if not _trusted_local(request):
+            return JSONResponse({"detail": "database unavailable"}, status_code=503)
+    if user is None:
+        if _trusted_local(request):
+            user = {"id": None, "username": "local", "role": "admin"}
+        else:
+            return _deny(request, 401, "login required")
+    request.state.user = user
+    if (p.startswith(ADMIN_PREFIX) or p in ADMIN_PATHS) and user["role"] != "admin":
+        return _deny(request, 403, "admin only")
+    return await call_next(request)
 
 
 @app.on_event("startup")
@@ -107,6 +169,10 @@ def _csv(v: str | None) -> list[str] | None:
     return [x.strip() for x in v.split(",") if x.strip()] if v else None
 
 
+def _is_admin(request: Request) -> bool:
+    return (getattr(request.state, "user", None) or {}).get("role") == "admin"
+
+
 def _feature(c: dict) -> dict:
     geom = ({"type": "Point", "coordinates": [c["lon"], c["lat"]]}
             if c.get("lat") is not None and c.get("lon") is not None else None)
@@ -114,8 +180,8 @@ def _feature(c: dict) -> dict:
 
 
 @api.get("/cameras")
-def cameras(source: str | None = None, status: str | None = None, bbox: str | None = None,
-            include_inactive: bool = False):
+def cameras(request: Request, source: str | None = None, status: str | None = None,
+            bbox: str | None = None, include_inactive: bool = False, include_hidden: bool = False):
     box = None
     if bbox:
         try:
@@ -123,7 +189,9 @@ def cameras(source: str | None = None, status: str | None = None, bbox: str | No
             assert len(box) == 4
         except Exception:
             raise HTTPException(400, "bbox must be minLon,minLat,maxLon,maxLat")
-    cams = get_store().list_cameras(_csv(source), _csv(status), box, include_inactive)
+    is_admin = _is_admin(request)
+    cams = get_store().list_cameras(_csv(source), _csv(status), box, include_inactive,
+                                    include_hidden=include_hidden and is_admin)
     body = {"type": "FeatureCollection", "count": len(cams), "features": [_feature(c) for c in cams]}
     return Response(json.dumps(body, ensure_ascii=False), media_type="application/geo+json",
                     headers={"Cache-Control": "no-cache"})
@@ -153,10 +221,10 @@ def _restream_info(cam_id: str) -> dict | None:
 
 
 @api.get("/cameras/{cam_id:path}")
-def camera(cam_id: str, history: int = Query(50, ge=0, le=1000)):
+def camera(request: Request, cam_id: str, history: int = Query(50, ge=0, le=1000)):
     store = get_store()
     cam = store.get_camera(cam_id)
-    if not cam:
+    if not cam or (cam.get("hidden") and not _is_admin(request)):
         raise HTTPException(404, "unknown camera")
     return cam | {"status_log": store.status_log(cam_id, history), "restream": _restream_info(cam_id)}
 
@@ -189,13 +257,78 @@ def resolve(cam_id: str):
 
 
 @api.post("/refresh")
-async def refresh(health: bool = True):
+async def refresh(request: Request, health: bool = True):
     if _lock.locked():
         return JSONResponse({"status": "already running"}, status_code=409)
+    if auth.enabled():
+        u = request.state.user or {}
+        try:
+            await asyncio.to_thread(auth.audit, u.get("username"), "refresh", None, {"health": health},
+                                    client_ip(request))
+        except Exception:
+            pass
     asyncio.create_task(asyncio.to_thread(_locked, collect, None, False, health))
     return {"status": "started"}
 
 
+# ---------------------------------------------------------------- auth endpoints
+class LoginBody(BaseModel):
+    username: str
+    password: str
+
+
+def _secure(request: Request) -> bool:
+    return request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
+
+
+@api.post("/auth/login")
+def login(body: LoginBody, request: Request):
+    if not auth.enabled():
+        raise HTTPException(503, "accounts need the database backend")
+    try:
+        token, user = auth.login(body.username, body.password, client_ip(request),
+                                 request.headers.get("user-agent", ""))
+    except auth.AuthError as e:
+        code = 429 if "too many" in str(e) else 503 if "database" in str(e) else 401
+        return JSONResponse({"detail": str(e)}, status_code=code)
+    resp = JSONResponse(user)
+    resp.set_cookie(auth.COOKIE, token, max_age=auth.SESSION_DAYS * 86400, httponly=True,
+                    samesite="lax", secure=_secure(request), path="/")
+    return resp
+
+
+@api.post("/auth/logout")
+def logout(request: Request):
+    if auth.enabled():
+        u = request.state.user or {}
+        auth.logout(request.cookies.get(auth.COOKIE))
+        auth.audit(u.get("username"), "logout", ip=client_ip(request))
+    resp = JSONResponse({"ok": True})
+    resp.delete_cookie(auth.COOKIE, path="/")
+    return resp
+
+
+@api.get("/auth/me")
+def me(request: Request):
+    u = request.state.user
+    if not auth.enabled():
+        return {"auth": False, "username": None, "role": "admin"}
+    return {"auth": True} | (u or {})
+
+
+@api.get("/auth/check")
+def check(request: Request):
+    """For nginx auth_request (protects /live/): 204 with a valid session, else 401."""
+    if not auth.enabled():
+        return Response(status_code=204)
+    try:
+        ok = auth.session_user(request.cookies.get(auth.COOKIE))
+    except auth.AuthError:
+        ok = None
+    return Response(status_code=204 if ok else 401)
+
+
+api.include_router(admin.router, prefix="/admin")
 app.include_router(api, prefix="/api/v1")
 app.include_router(api, prefix="/api", include_in_schema=False)   # legacy paths
 
@@ -280,6 +413,16 @@ async def live_passthrough(rest: str):
     return StreamingResponse(body(), status_code=up.status_code,
                              media_type=up.headers.get("content-type", "application/octet-stream"),
                              headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/login", include_in_schema=False)
+def login_page():
+    return FileResponse(WEB / "login.html", headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/admin", include_in_schema=False)
+def admin_page():
+    return FileResponse(WEB / "admin.html", headers={"Cache-Control": "no-cache"})
 
 
 app.mount("/", StaticFiles(directory=WEB, html=True), name="web")

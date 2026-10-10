@@ -2,8 +2,8 @@
 # CCTV Map — one-shot installer for a fresh Ubuntu 24.04 VM (idempotent: re-run to update)
 #
 #   sudo bash deploy/install.sh                       # HTTP on the VM's IP
-#   sudo bash deploy/install.sh --auth                # + password-protect the site (prompts once;
-#                                                     #   stays on for later re-runs, --no-auth removes)
+#   (the site needs a login: the first run asks for the first admin account; add more
+#    users on the Admin page, or:  sudo -u cctv /opt/cctv-map/.venv/bin/python -m server.users ...)
 #   sudo bash deploy/install.sh --domain cctv.example.com --email you@example.com   # + HTTPS
 #                                                     #   (remembered for later re-runs; --no-domain drops it)
 #
@@ -17,14 +17,13 @@ APP_USER=cctv
 DB_NAME=cctvmap
 # peer auth over the local socket: the "cctv" OS user logs in as DB role "cctv" — no password
 DB_URL="postgresql:///$DB_NAME"
-DOMAIN=""; EMAIL=""; AUTH=0
+DOMAIN=""; EMAIL=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --domain) DOMAIN="$2"; shift 2 ;;
     --email)  EMAIL="$2";  shift 2 ;;
-    --auth)   AUTH=1;      shift ;;
     --no-domain) DOMAIN="-"; shift ;;
-    --no-auth) AUTH=-1;    shift ;;
+    --auth|--no-auth) echo "note: $1 is obsolete — the app now has its own user accounts"; shift ;;
     *) echo "unknown option: $1"; exit 1 ;;
   esac
 done
@@ -76,6 +75,10 @@ sudo -u postgres psql -qtAc "SELECT 1 FROM pg_roles WHERE rolname='$APP_USER'" |
 sudo -u postgres psql -qtAc "SELECT 1 FROM pg_database WHERE datname='$DB_NAME'" | grep -q 1 || \
   sudo -u postgres psql -qc "CREATE DATABASE $DB_NAME OWNER $APP_USER"
 sudo -u "$APP_USER" env DATABASE_URL="$DB_URL" bash -c "cd $APP_DIR && .venv/bin/python -m db.migrate"
+
+log "Admin account"
+# interactive on a terminal; otherwise a random password is generated and printed once
+sudo -u "$APP_USER" env DATABASE_URL="$DB_URL" bash -c "cd $APP_DIR && .venv/bin/python -m server.users ensure-admin"
 
 # ------------------------------------------------------------------ systemd
 log "Installing systemd services"
@@ -174,20 +177,16 @@ EOF
 # ------------------------------------------------------------------ nginx
 log "Configuring nginx"
 SERVER_NAME="${DOMAIN:-_}"
-AUTH_BLOCK=""
-# login stays on across re-runs once a password file exists (use --no-auth to turn it off)
-[[ $AUTH -eq 0 && -f /etc/nginx/.cctv_htpasswd ]] && AUTH=1
-if [[ $AUTH -eq 1 ]]; then
-  if [[ ! -f /etc/nginx/.cctv_htpasswd ]]; then
-    read -rp "Username for the site: " U
-    htpasswd -c /etc/nginx/.cctv_htpasswd "$U"     # prompts for the password
-  fi
-  AUTH_BLOCK='auth_basic "CCTV Map"; auth_basic_user_file /etc/nginx/.cctv_htpasswd;'
+# The shared nginx password (--auth) is retired: every user has an app account now.
+if [[ -f /etc/nginx/.cctv_htpasswd ]]; then
+  mv /etc/nginx/.cctv_htpasswd /etc/nginx/.cctv_htpasswd.retired
+  echo "  old shared site password retired (/etc/nginx/.cctv_htpasswd.retired) — sign in with app accounts"
 fi
 
 cat > /etc/nginx/conf.d/cctv-ratelimit.conf <<'EOF'
 limit_req_zone $binary_remote_addr zone=cctv_api:10m rate=10r/s;
 limit_req_zone $binary_remote_addr zone=cctv_hls:10m rate=40r/s;
+limit_req_zone $binary_remote_addr zone=cctv_login:10m rate=10r/m;
 EOF
 
 cat > /etc/nginx/sites-available/cctv-map <<EOF
@@ -196,7 +195,6 @@ server {
     server_name $SERVER_NAME;
     server_tokens off;
     client_max_body_size 1m;
-    $AUTH_BLOCK
 
     gzip on;
     gzip_types application/json application/geo+json application/javascript text/css application/vnd.apple.mpegurl;
@@ -206,8 +204,17 @@ server {
     proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto \$scheme;
 
+    # session check for the re-stream (MediaMTX has no idea about our accounts)
+    location = /_auth {
+        internal;
+        proxy_pass http://127.0.0.1:8080/api/v1/auth/check;
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length "";
+        proxy_set_header X-Original-URI \$request_uri;
+    }
     location /live/ {
         limit_req zone=cctv_hls burst=80 nodelay;
+        auth_request /_auth;
         proxy_pass http://127.0.0.1:8888/;
         proxy_buffering off;
         proxy_read_timeout 60s;
@@ -217,6 +224,11 @@ server {
         proxy_pass http://127.0.0.1:8080;
         proxy_buffering off;
         proxy_read_timeout 60s;
+    }
+    location = /api/v1/auth/login {
+        limit_req zone=cctv_login burst=5 nodelay;
+        limit_req_status 429;
+        proxy_pass http://127.0.0.1:8080;
     }
     location /api/ {
         limit_req zone=cctv_api burst=20 nodelay;

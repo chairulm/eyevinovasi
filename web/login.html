@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Sign in · Eyevinovasi CCTV Map</title>
+<style>
+  :root { --bg:#f6f7f9; --panel:#fff; --ink:#14171c; --muted:#66707d; --line:#e3e6eb; --accent:#2563eb; --bad:#dc2626;
+          font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0f1216; --panel:#161a20; --ink:#e7eaee; --muted:#95a0ad; --line:#262c35; } }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink); }
+  body { display: grid; place-items: center; min-height: 100vh; padding: 16px; }
+  form { width: 100%; max-width: 360px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 26px 24px; display: grid; gap: 14px; }
+  .brand { display: flex; gap: 8px; align-items: center; font-weight: 700; font-size: 18px; }
+  .sub { color: var(--muted); font-size: 13px; margin-top: -8px; }
+  label { display: grid; gap: 5px; font-size: 13px; color: var(--muted); }
+  input { font: inherit; padding: 10px 11px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+  input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 40%, transparent); border-color: var(--accent); }
+  button { font: inherit; font-weight: 600; cursor: pointer; padding: 10px; border-radius: 8px; border: 0; background: var(--accent); color: #fff; }
+  button:disabled { opacity: .6; cursor: default; }
+  .err { color: var(--bad); font-size: 13px; min-height: 1.2em; margin: 0; }
+  .foot { color: var(--muted); font-size: 12px; text-align: center; }
+</style>
+</head>
+<body>
+<form id="f" autocomplete="on">
+  <div class="brand">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M3 7.5 15.5 4l1.4 4.9-12.5 3.6zM16.9 8.9l2.6-.8.9 3.1-2.6.8zM9 12.3l1.6 4.3H6.2v2.4H4v-6.7z"/></svg>
+    <span>CCTV Map</span>
+  </div>
+  <div class="sub">Sign in to continue</div>
+  <label>Username <input id="u" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus></label>
+  <label>Password <input id="p" name="password" type="password" autocomplete="current-password" required></label>
+  <p class="err" id="err" role="alert"></p>
+  <button id="go" type="submit">Sign in</button>
+  <div class="foot">Accounts are created by an administrator.</div>
+</form>
+<script>
+  const f = document.getElementById("f"), err = document.getElementById("err"), go = document.getElementById("go");
+  const next = (() => {
+    const n = new URLSearchParams(location.search).get("next") || "/";
+    return n.startsWith("/") && !/^\/[\/\\]/.test(n) &&!n.startsWith("/login") ? n : "/";   // same-site only
+  })();
+  f.onsubmit = async (e) => {
+    e.preventDefault(); err.textContent = ""; go.disabled = true; go.textContent = "Signing in…";
+    try {
+      const r = await fetch("/api/v1/auth/login", {
+        method: "POST", headers: { "Content-Type": "application/json", "X-Eye": "1" },
+        body: JSON.stringify({ username: f.username.value.trim(), password: f.password.value }),
+      });
+      if (r.ok) { location.replace(next.includes("#") ? next : next + location.hash); return; }   // keep deep links
+      const d = await r.json().catch(() => ({}));
+      err.textContent = d.detail || ("Sign-in failed (" + r.status + ")");
+      f.password.value = ""; f.password.focus();
+    } catch { err.textContent = "Network error — try again."; }
+    go.disabled = false; go.textContent = "Sign in";
+  };
+</script>
+</body>
+</html>

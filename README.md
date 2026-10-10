@@ -34,7 +34,7 @@ These seed files are snapshots captured on 10 Oct 2026.
 ```bash
 apt-get update && apt-get install -y git
 git clone https://github.com/chairulm/eyevinovasi.git && cd eyevinovasi
-sudo bash deploy/install.sh --auth     # --auth: site login (asked once); --domain/--email for HTTPS
+sudo bash deploy/install.sh            # first run asks for the admin account; --domain/--email for HTTPS
 sudo bash /opt/cctv-map/deploy/check.sh
 ```
 
@@ -44,7 +44,7 @@ Update later with:
 cd ~/eyevinovasi && git pull && sudo bash deploy/install.sh
 ```
 
-The installer is idempotent. It keeps your camera data in `/opt/cctv-map/data` and the site login.
+The installer is idempotent. It keeps your camera data in `/opt/cctv-map/data`, the accounts and the HTTPS settings.
 The services are `cctv-map` (app) and `cctv-grabber` (frame capture for analytics, off by default), with nginx in front on port 80/443.
 
 ## Architecture
@@ -78,6 +78,24 @@ If `DATABASE_URL` isn't set, or the database is down, the app falls back to `dat
 
 Migrations: add `db/migrations/NNN_name.sql`. They're applied in order by `python -m db.migrate`, which the installer runs.
 
+### Accounts & admin
+
+Everyone signs in with their own account (Postgres backend; with no `DATABASE_URL` the app runs open, for local dev).
+
+- **viewer**: map, live video, history. **admin**: also the Admin page (`/admin`) and `POST /refresh`.
+- Admin page: **Users** (create, role, disable, reset password, delete), **Collector & health** (per-source counts, runs, re-scrape now), **Cameras** (overrides: hide, rename, fix location, note; they survive every scrape and show as "corrected"), **Audit log** (logins, failures, every admin change).
+- Sessions: random token in an HttpOnly cookie (14 days); the DB stores only its SHA-256. Passwords use scrypt.
+- Brute force: 8 failed logins per IP (or 50 per username) in 15 min → blocked for 15 min; nginx also rate-limits the login URL.
+- CSRF: non-GET API calls must send `X-Eye: 1`. `/live/` (MediaMTX) is guarded by nginx `auth_request`.
+- Requests made on the VM itself to `127.0.0.1:8080` (not through nginx) may read without a session, so `check.sh` keeps working.
+
+Shell (on the VM):
+
+```bash
+cd /opt/cctv-map && sudo -u cctv env DATABASE_URL=postgresql:///cctvmap .venv/bin/python -m server.users list
+#   ... create <name> [--role admin] | reset-password <name> | ensure-admin
+```
+
 ### API v1
 
 | Endpoint | Notes |
@@ -88,7 +106,11 @@ Migrations: add `db/migrations/NNN_name.sql`. They're applied in order by `pytho
 | `GET /api/v1/stats` | counts + last collector runs |
 | `GET /api/v1/health` | backend (postgres/json) and schema version |
 | `GET /api/v1/resolve/{id}` | fresh player URL for tokenised sources |
-| `POST /api/v1/refresh` | re-scrape + health check in background |
+| `POST /api/v1/refresh` | re-scrape + health check in background (admin) |
+| `POST /api/v1/auth/login` · `logout`, `GET /api/v1/auth/me` | session cookie |
+| `/api/v1/admin/...` | users, sources, runs, overrides, audit (admin) |
+
+All endpoints except `/health` and `/auth/login` need a session; `include_hidden=1` on `/cameras` is honoured for admins.
 
 ### Re-streaming (MediaMTX)
 

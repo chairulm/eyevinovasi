@@ -25,17 +25,27 @@ ufw status | sed 's/^/  /' | head -15
 sec "App API"
 if curl -sf --max-time 5 http://127.0.0.1:8080/api/stats >/tmp/cctv_stats; then ok "API: $(cat /tmp/cctv_stats)"; else bad "API not responding on 127.0.0.1:8080"; fi
 code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1/)
-[[ $code == 200 || $code == 401 ]] && ok "nginx :80 -> HTTP $code" || bad "nginx :80 -> HTTP $code"
+[[ $code =~ ^(200|301|302|401)$ ]] && ok "nginx :80 -> HTTP $code" || bad "nginx :80 -> HTTP $code"
 
 if [[ -f /etc/cctv-map/deploy.conf ]]; then
   D=$(sed -n 's/^DOMAIN=//p' /etc/cctv-map/deploy.conf)
   if [[ -n "$D" ]]; then
     code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "https://$D/")
-    [[ $code == 200 || $code == 401 ]] && ok "https://$D -> HTTP $code" || bad "https://$D -> HTTP $code (certificate or DNS problem?)"
+    [[ $code =~ ^(200|302|401)$ ]] && ok "https://$D -> HTTP $code" || bad "https://$D -> HTTP $code (certificate or DNS problem?)"
     exp=$(echo | openssl s_client -connect 127.0.0.1:443 -servername "$D" 2>/dev/null | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)
     [[ -n "$exp" ]] && echo "  certificate expires: $exp (auto-renewed by certbot.timer)"
   fi
 fi
+
+sec "Login"
+code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 -H 'Host: localhost' http://127.0.0.1:8080/api/v1/cameras -H 'X-Real-IP: 203.0.113.9')
+[[ $code == 401 ]] && ok "API without a session -> 401 (login enforced)" || bad "API without a session -> HTTP $code (expected 401)"
+code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:8080/login)
+[[ $code == 200 ]] && ok "login page -> 200" || bad "login page -> HTTP $code"
+grep -q auth_request /etc/nginx/sites-available/cctv-map && ok "nginx protects /live/ (auth_request)" || bad "nginx /live/ not protected — re-run install.sh"
+sudo -u postgres psql -d cctvmap -qtA -c "SELECT '  accounts: '||count(*)||' ('||count(*) FILTER (WHERE role='admin' AND active)||' active admin), sessions: '
+  ||(SELECT count(*) FROM sessions WHERE expires_at > now())||', failed logins 24h: '
+  ||(SELECT count(*) FROM audit_log WHERE action='login_failed' AND at > now()-interval '1 day') FROM users" 2>/dev/null
 
 sec "Database"
 h=$(curl -s --max-time 5 http://127.0.0.1:8080/api/v1/health)
