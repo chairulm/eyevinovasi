@@ -13,11 +13,11 @@ echo "  CPU $(nproc) | RAM $(free -h | awk '/Mem/ {print $3"/"$2}') | Disk $(df 
 echo "  IPs: $(hostname -I) | TZ: $(timedatectl show -p Timezone --value 2>/dev/null)"
 
 sec "Services"
-for s in cctv-map nginx postgresql fail2ban cctv-grabber; do
+for s in cctv-map cctv-restream nginx postgresql fail2ban cctv-grabber; do
   st=$(systemctl is-active $s 2>/dev/null); en=$(systemctl is-enabled $s 2>/dev/null)
   [[ $st == active ]] && ok "$s ($en)" || echo "  [--]   $s: $st ($en)"
 done
-ss -tlnH | awk '{print $4}' | grep -E ':(80|443|8080)$' | sed 's/^/  listening /'
+ss -tlnH | awk '{print $4}' | grep -E ':(80|443|8080|8888|8554|9997)$' | sed 's/^/  listening /'
 
 sec "Firewall"
 ufw status | sed 's/^/  /' | head -15
@@ -78,7 +78,7 @@ $PY - <<'EOF' 2>/dev/null | sed 's/^/  /'
 import json, urllib.parse, urllib.request
 d = json.load(open('/opt/cctv-map/data/cameras.json'))
 for src in ('medan', 'jogja', 'binamarga'):
-    cam = next((c for c in d if c['source'] == src and c['playback'] == 'hls' and c['status'] != 'offline'), None)
+    cam = next((c for c in d if c['source'] == src and c['playback'] == 'hls' and c['status'] == 'online'), None)
     if not cam: print(f"[--]   {src}: no candidate"); continue
     u = 'http://127.0.0.1:8080/hls?u=' + urllib.parse.quote(cam['stream_url'], safe='')
     try:
@@ -88,6 +88,23 @@ for src in ('medan', 'jogja', 'binamarga'):
         print(f"[FAIL] {src}: {cam['id']} {e}")
 EOF
 
+sec "Re-stream (MediaMTX)"
+n=$(curl -s --max-time 5 http://127.0.0.1:9997/v3/paths/list | $PY -c "import json,sys;d=json.load(sys.stdin);print(d['itemCount'], sum(1 for p in d['items'] if p['ready']))" 2>/dev/null)
+if [[ -n "$n" ]]; then ok "MediaMTX API: $(cut -d' ' -f1 <<<"$n") camera paths, $(cut -d' ' -f2 <<<"$n") active now"; else bad "MediaMTX API not responding (systemctl status cctv-restream)"; fi
+$PY - <<'EOF' 2>/dev/null | sed 's/^/  /'
+import json, re, urllib.request
+d = json.load(open('/opt/cctv-map/data/cameras.json'))
+for src in ('medan', 'jogja', 'binamarga'):
+    cam = next((c for c in d if c['source'] == src and c['playback'] == 'hls' and c['status'] == 'online'), None)
+    if not cam: print(f"[--]   {src}: no online camera to test"); continue
+    path = re.sub(r"[^A-Za-z0-9_.~-]+", "_", cam['id'])
+    try:
+        body = urllib.request.urlopen(f"http://127.0.0.1:8888/{path}/index.m3u8", timeout=30).read(300).decode('utf-8', 'replace')
+        print(("[OK]   " if '#EXTM3U' in body else "[FAIL] ") + f"re-stream {src}: {cam['id']}")
+    except Exception as e:
+        print(f"[FAIL] re-stream {src}: {cam['id']} {e}")
+EOF
+
 sec "Recent errors (cctv-map, last 2h)"
-journalctl -u cctv-map --since '-2h' -p warning --no-pager | tail -15 | sed 's/^/  /'
+journalctl -u cctv-map -u cctv-restream --since '-2h' -p warning --no-pager | tail -15 | sed 's/^/  /'
 echo; echo "== end of report =="

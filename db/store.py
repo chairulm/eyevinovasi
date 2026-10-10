@@ -38,8 +38,31 @@ def _bbox_ok(c: dict, bbox) -> bool:
 
 
 def _with_ready(d: dict) -> dict:
+    from restream.config import live_url
     d["analytics_ready"] = d.get("playback") == "hls" and bool(d.get("stream_url"))
+    d["live_url"] = live_url(d)   # our re-stream (None when RESTREAM is off)
     return d
+
+
+def _uptime(rows: list[dict], days: int, now: datetime) -> dict:
+    """rows: status changes ascending, the first may predate the window.
+    Returns online share of *known* time plus contiguous segments for a timeline bar."""
+    from datetime import timedelta
+    start = now - timedelta(days=days)
+    segs = []
+    for i, r in enumerate(rows):
+        at = r["at"] if isinstance(r["at"], datetime) else datetime.fromisoformat(r["at"])
+        nxt = rows[i + 1]["at"] if i + 1 < len(rows) else now
+        nxt = nxt if isinstance(nxt, datetime) else datetime.fromisoformat(nxt)
+        a, b = max(at, start), min(nxt, now)
+        if b > a:
+            segs.append({"from": a.isoformat(), "to": b.isoformat(), "status": r["status"]})
+    known = sum((datetime.fromisoformat(x["to"]) - datetime.fromisoformat(x["from"])).total_seconds()
+                for x in segs)
+    on = sum((datetime.fromisoformat(x["to"]) - datetime.fromisoformat(x["from"])).total_seconds()
+             for x in segs if x["status"] == "online")
+    return {"days": days, "window_start": start.isoformat(), "known_hours": round(known / 3600, 1),
+            "online_pct": round(100 * on / known, 1) if known else None, "segments": segs}
 
 
 # --------------------------------------------------------------------------- JSON
@@ -66,6 +89,9 @@ class JsonStore:
 
     def status_log(self, cam_id, limit=100):
         return []
+
+    def uptime(self, cam_id, days=7):
+        return {"days": days, "online_pct": None, "known_hours": 0, "segments": []}
 
     def recent_runs(self, limit=10):
         return []
@@ -136,6 +162,19 @@ class PgStore(JsonStore):
             rows = c.execute("SELECT at, status FROM camera_status_log WHERE camera_id = %s "
                              "ORDER BY at DESC LIMIT %s", (cam_id, limit)).fetchall()
         return [self._iso(r) for r in rows]
+
+    def uptime(self, cam_id, days=7):
+        now = datetime.now(timezone.utc)
+        with self.pool.connection() as c:
+            rows = c.execute(
+                """(SELECT at, status FROM camera_status_log
+                     WHERE camera_id = %(id)s AND at < now() - make_interval(days => %(d)s)
+                     ORDER BY at DESC LIMIT 1)
+                   UNION ALL
+                   (SELECT at, status FROM camera_status_log
+                     WHERE camera_id = %(id)s AND at >= now() - make_interval(days => %(d)s))
+                   ORDER BY at""", {"id": cam_id, "d": days}).fetchall()
+        return _uptime(rows, days, now)
 
     def recent_runs(self, limit=10):
         with self.pool.connection() as c:

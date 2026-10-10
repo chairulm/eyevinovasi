@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CCTV Map Indonesia</title>
+<title>Eyevinovasi CCTV Map</title>
 <link rel="stylesheet" href="vendor/leaflet.css">
 <link rel="stylesheet" href="vendor/MarkerCluster.css">
 <link rel="stylesheet" href="vendor/MarkerCluster.Default.css">
@@ -39,6 +39,23 @@
   </aside>
 
   <main id="map"></main>
+
+  <aside id="detail" class="hidden" aria-label="Camera details">
+    <header>
+      <div class="d-head">
+        <h3 id="d-title"></h3>
+        <div id="d-sub" class="d-sub"></div>
+      </div>
+      <span id="d-status" class="pill"></span>
+      <button id="d-close" class="ghost" aria-label="Close">✕</button>
+    </header>
+    <nav id="d-tabs" role="tablist">
+      <button role="tab" data-tab="live" aria-selected="true">Live</button>
+      <button role="tab" data-tab="history" aria-selected="false">History</button>
+      <button role="tab" data-tab="info" aria-selected="false">Info</button>
+    </nav>
+    <div id="d-body"></div>
+  </aside>
 
   <section id="wall" class="hidden" aria-label="Video wall">
     <div class="wall-head">

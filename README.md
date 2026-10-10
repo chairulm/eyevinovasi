@@ -52,6 +52,7 @@ The services are `cctv-map` (app) and `cctv-grabber` (frame capture for analytic
 ```
 collector/            per-source scrapers → one Camera schema → database (+ cameras.json export)
 db/                   Postgres schema migrations (db/migrations/*.sql), store with JSON fallback
+restream/             MediaMTX config generator: one on-demand path per HLS camera
   sources/medan.py    API + runtime credential discovery
   sources/jogja.py    JSON endpoint
   sources/binamarga.py  inline-JS parse, play-page → m3u8 resolution, Kemenhub resolver
@@ -59,7 +60,8 @@ db/                   Postgres schema migrations (db/migrations/*.sql), store wi
 server/app.py         FastAPI: versioned API /api/v1/* (legacy /api/* kept), see below,
                       /hls?u=…  HLS reverse proxy (CORS + Referer + mixed-content fix,
                       host allow-list, playlist URI rewriting)
-web/                  Leaflet + markercluster + hls.js (vendored, no CDN needed)
+web/                  Leaflet + markercluster + hls.js (vendored, no CDN needed); camera detail
+                      panel (Live / History / Info) and a 4-up video wall
 analytics/            frame_grabber.py (ffmpeg, 1 frame/interval) → vehicle_count.py (YOLO example)
 ```
 
@@ -81,11 +83,23 @@ Migrations: add `db/migrations/NNN_name.sql`. They're applied in order by `pytho
 | Endpoint | Notes |
 |---|---|
 | `GET /api/v1/cameras` | GeoJSON. Filters: `source=medan,jogja`, `status=online`, `bbox=minLon,minLat,maxLon,maxLat`, `include_inactive=1` |
-| `GET /api/v1/cameras/{id}` | camera + `status_log` (recent changes) |
+| `GET /api/v1/cameras/{id}` | camera + `status_log` (recent changes) + `restream` (active, viewers) |
+| `GET /api/v1/cameras/{id}/uptime?days=7` | online % of tracked time + timeline segments |
 | `GET /api/v1/stats` | counts + last collector runs |
 | `GET /api/v1/health` | backend (postgres/json) and schema version |
 | `GET /api/v1/resolve/{id}` | fresh player URL for tokenised sources |
 | `POST /api/v1/refresh` | re-scrape + health check in background |
+
+### Re-streaming (MediaMTX)
+
+`cctv-restream` runs MediaMTX ([bluenviron/mediamtx](https://github.com/bluenviron/mediamtx), pinned v1.9.3). Every HLS camera is a path that pulls its upstream **only while someone watches**, then closes 30 s after the last viewer leaves.
+
+- Viewers: `/live/<path>/index.m3u8` (nginx → MediaMTX HLS on 127.0.0.1:8888)
+- Analytics: `rtsp://127.0.0.1:8554/<path>` (local only; the frame grabber uses it)
+- The player tries the re-stream first, then the `/hls` proxy, then a direct connection from the browser.
+
+The config (`data/mediamtx.yml`) is regenerated after every scrape, and MediaMTX reloads it automatically.
+Sources are HLS, so the 6–10 s upstream delay remains. WebRTC is deliberately off, and no extra ports are opened.
 
 ### Camera schema
 

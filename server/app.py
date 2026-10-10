@@ -7,7 +7,8 @@ Storage: Postgres when DATABASE_URL is set (see db/), else data/cameras.json.
 API v1 (also served at the legacy /api/... paths for compatibility)
   GET  /api/v1/cameras                 GeoJSON; filters: ?source=medan,jogja &status=online
                                        &bbox=minLon,minLat,maxLon,maxLat &include_inactive=1
-  GET  /api/v1/cameras/{id}            one camera + recent status changes
+  GET  /api/v1/cameras/{id}            one camera + recent status changes + re-stream state
+  GET  /api/v1/cameras/{id}/uptime     online share + timeline segments (?days=7)
   GET  /api/v1/stats                   counts per source / status (+ last collector runs)
   GET  /api/v1/health                  backend + database status (for monitoring)
   GET  /api/v1/resolve/{id}            fresh player URL for tokenised sources (Kemenhub)
@@ -128,13 +129,36 @@ def cameras(source: str | None = None, status: str | None = None, bbox: str | No
                     headers={"Cache-Control": "no-cache"})
 
 
+@api.get("/cameras/{cam_id:path}/uptime")
+def camera_uptime(cam_id: str, days: int = Query(7, ge=1, le=90)):
+    store = get_store()
+    if not store.get_camera(cam_id):
+        raise HTTPException(404, "unknown camera")
+    return store.uptime(cam_id, days)
+
+
+def _restream_info(cam_id: str) -> dict | None:
+    """Live state of our re-stream for this camera (MediaMTX API, local only)."""
+    from restream.config import ENABLED, path_name
+    if not ENABLED:
+        return None
+    try:
+        r = httpx.get(f"http://127.0.0.1:9997/v3/paths/get/{path_name(cam_id)}", timeout=1.5)
+        if r.status_code == 404:
+            return {"active": False, "viewers": 0}
+        d = r.json()
+        return {"active": bool(d.get("ready")), "viewers": len(d.get("readers") or [])}
+    except Exception:
+        return {"active": None, "viewers": None}
+
+
 @api.get("/cameras/{cam_id:path}")
 def camera(cam_id: str, history: int = Query(50, ge=0, le=1000)):
     store = get_store()
     cam = store.get_camera(cam_id)
     if not cam:
         raise HTTPException(404, "unknown camera")
-    return cam | {"status_log": store.status_log(cam_id, history)}
+    return cam | {"status_log": store.status_log(cam_id, history), "restream": _restream_info(cam_id)}
 
 
 @api.get("/stats")
@@ -235,6 +259,27 @@ async def hls(u: str = Query(..., description="absolute upstream URL")):
     return StreamingResponse(body_iter(), status_code=up.status_code,
                              media_type=ctype or "video/mp2t",
                              headers={"Access-Control-Allow-Origin": "*", "Cache-Control": "no-cache"})
+
+
+@app.get("/live/{rest:path}")
+async def live_passthrough(rest: str):
+    """Re-stream output. In production nginx serves /live/ straight from MediaMTX;
+    this route only matters when running the app without nginx (dev/tests)."""
+    try:
+        up = await _http.send(_http.build_request("GET", f"http://127.0.0.1:8888/{rest}"), stream=True)
+    except httpx.HTTPError:
+        raise HTTPException(502, "re-stream server not reachable")
+
+    async def body():
+        try:
+            async for chunk in up.aiter_bytes(64 * 1024):
+                yield chunk
+        finally:
+            await up.aclose()
+
+    return StreamingResponse(body(), status_code=up.status_code,
+                             media_type=up.headers.get("content-type", "application/octet-stream"),
+                             headers={"Cache-Control": "no-cache"})
 
 
 app.mount("/", StaticFiles(directory=WEB, html=True), name="web")

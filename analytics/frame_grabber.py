@@ -42,12 +42,16 @@ def grab(cam, timeout=25) -> Path | None:
     out_dir = FRAMES / safe(cam.id)
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / (datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + ".jpg")
-    cmd = [
-        "ffmpeg", "-nostdin", "-loglevel", "error", "-y",
-        "-user_agent", UA, "-headers", f"Referer: {ref}\r\n",
-        "-rw_timeout", "15000000",
-        "-i", cam.stream_url, "-frames:v", "1", "-q:v", "3", str(out),
-    ]
+    from restream.config import ENABLED, path_name
+    if ENABLED:
+        # read our local re-stream: the agency's server is pulled once for viewers + analytics
+        src = ["-rtsp_transport", "tcp", "-timeout", "15000000",
+               "-i", f"rtsp://127.0.0.1:8554/{path_name(cam.id)}"]
+    else:
+        src = ["-user_agent", UA, "-headers", f"Referer: {ref}\r\n",
+               "-rw_timeout", "15000000", "-i", cam.stream_url]
+    cmd = ["ffmpeg", "-nostdin", "-loglevel", "error", "-y", *src,
+           "-frames:v", "1", "-q:v", "3", str(out)]
     try:
         subprocess.run(cmd, timeout=timeout, check=True, capture_output=True)
         return out

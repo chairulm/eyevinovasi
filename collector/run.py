@@ -78,6 +78,9 @@ def collect(only=None, seed_only=False, health=False) -> list:
     store = get_store()
     store.persist(uniq, runs)
     log.info("saved %d cameras (%s store)", len(uniq), store.kind)
+    from restream import config as restream
+    if restream.ENABLED:
+        restream.write(store.list_cameras())
     return uniq
 
 
