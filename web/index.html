@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CCTV Map Indonesia</title>
+<link rel="stylesheet" href="vendor/leaflet.css">
+<link rel="stylesheet" href="vendor/MarkerCluster.css">
+<link rel="stylesheet" href="vendor/MarkerCluster.Default.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div id="app">
+  <aside id="side">
+    <header>
+      <div class="brand">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M3 7.5 15.5 4l1.4 4.9-12.5 3.6zM16.9 8.9l2.6-.8.9 3.1-2.6.8zM9 12.3l1.6 4.3H6.2v2.4H4v-6.7z"/></svg>
+        <span>CCTV Map</span>
+      </div>
+      <button id="refresh" class="ghost" title="Re-scrape sources and re-check streams">Refresh</button>
+    </header>
+
+    <section class="stats" id="stats"></section>
+
+    <input id="q" type="search" placeholder="Search name, road, area…" autocomplete="off">
+
+    <div class="filters">
+      <div class="label">Source</div>
+      <div id="f-source" class="chips"></div>
+      <div class="label">Category</div>
+      <div id="f-cat" class="chips"></div>
+      <div class="label">Playback</div>
+      <div id="f-play" class="chips"></div>
+    </div>
+
+    <div class="list-head"><span id="count">0</span> cameras <span class="hint">· click to locate</span></div>
+    <ul id="list"></ul>
+    <footer>Data: ATCS Dishub Medan · Pemkot Yogyakarta · Ditjen Bina Marga PUPR</footer>
+  </aside>
+
+  <main id="map"></main>
+
+  <section id="wall" class="hidden" aria-label="Video wall">
+    <div class="wall-head">
+      <strong>Live view</strong>
+      <span class="hint" id="wall-hint">up to 4 streams</span>
+      <button id="wall-close" class="ghost">Close all</button>
+    </div>
+    <div id="tiles"></div>
+  </section>
+</div>
+
+<button id="toggle-side" class="fab" aria-label="Toggle list">☰</button>
+
+<script src="vendor/leaflet.js"></script>
+<script src="vendor/leaflet.markercluster.js"></script>
+<script src="vendor/hls.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

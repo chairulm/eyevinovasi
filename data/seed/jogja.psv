@@ -1,0 +1,146 @@
+1|Simpang APMD (PTZ)|-7.79197|110.39164|1|GONDOKUSUMAN|/atcs/ATCS_apmd
+2|Simpang Jlagran (PTZ)|-7.78904|110.35752|1|GEDONGTENGEN|/atcs/ATCS_jlagran
+6|Simpang Gondomanan (PTZ)|-7.80168|110.36917|1|GONDOMANAN|/atcs/ATCS_gondomanan
+9|Simpang Jokteng Kulon (PTZ)|-7.81294|110.35594|1|MANTRIJERON|/atcs/ATCS_joktengkulon
+10|Simpang Jokteng Wetan|-7.81438|110.36807|1|KRATON|/atcs/ATCS_joktengwetan
+14|Simpang KM Nol (PTZ)|-7.80108|110.36475|1|GONDOMANAN|/atcs/ATCS_kmnol
+16|Simpang Permata (PTZ)|-7.80154|110.37307|1|PAKUALAMAN|/atcs/ATCS_permata
+17|Simpang PKU Muh. (PTZ)|-7.80128|110.36206|1|GONDOMANAN|/atcs/ATCS_pkumuh
+19|Simpang Sentul (PTZ)|-7.80144|110.37794|1|PAKUALAMAN|/atcs/ATCS_sentul
+20|Simpang Serangan (PTZ)|-7.80063|110.35540|1|NGAMPILAN|/atcs/ATCS_serangan
+21|Simpang SGM (PTZ)|-7.80193|110.39514|1|UMBULHARJO|/atcs/ATCS_simpangsgm
+22|Simpang Tungkak (PTZ)|-7.81564|110.37609|1|MERGANGSAN|/atcs/ATCS_tungkak
+23|Simpang Tunjung (PTZ)|-7.79373|110.37776|1|DANUREJAN|/atcs/ATCS_tunjung
+24|Simpang UKDW (PTZ)|-7.78725|110.37864|1|GONDOKUSUMAN|/atcs/ATCS_ukdw
+25|Simpang Wirobrajan (PTZ)|-7.80103|110.35178|1|WIROBRAJAN|/atcs/ATCS_wirobrajan
+29|Sungai Gajah Wong 2|-7.79091|110.39598|2|UMBULHARJO|/bpbd/BPBD_gajahwong2
+30|Sungai Winongo|-7.78949|110.35666|2|GEDONGTENGEN|/bpbd/BPBD_kaliwinongo
+31|Sungai Ngentak|-7.72265|110.38926|2|NGAGLIK|/bpbd/BPBD_ngentak
+33|Malioboro_Selatan_Teteg|-7.78997|110.36603|3|GEDONGTENGEN|/malioboro/Malioboro_1_Selatan_Teteg
+34|Malioboro_Depan_Toko_Subur|-7.79094|110.36598|3|GEDONG TENGEN|/malioboro/Malioboro_2_Depan_Toko_Subur
+35|Malioboro_Depan_Dispar|-7.79486|110.36556|3|GEDONG TENGEN|/malioboro/Malioboro_3_Depan_Dispar
+89|Malioboro_Depan_DPRD|-7.79206|110.36589|3|GEDONG TENGEN|/malioboro/Malioboro_4_Depan_DPRD
+91|Malioboro_Perwakilan|-7.79263|110.36580|3|GEDONG TENGEN|/malioboro/Malioboro_5_Perwakilan
+92|Malioboro_Mall_Utara|-7.79283|110.36575|3|GEDONG TENGEN|/malioboro/Malioboro_6_Mall_Utara
+93|Malioboro_Mall_Selatan|-7.79553|110.36555|3|GEDONG TENGEN|/malioboro/Malioboro_7_Mall_Selatan
+94|Malioboro_Pasar_Beringharjo|-7.79872|110.36498|3|GONDOMANAN|/malioboro/Malioboro_30_Pasar_Beringharjo
+129|Simpang UST (PTZ)|-7.80196|110.39199|1|UMBULHARJO|/atcs/ATCS_UST
+130|Simpang Glagahsari|-7.80205|110.38908|1|UMBULHARJO|/atcs/ATCS_Glagahsari
+147|Simpang Ibu Ruswo (PTZ)|-7.80345|110.36924|1|GONDOMANAN|/atcs/ATCS_Ibu_Ruswo
+148|Simpang BPK (PTZ)|-7.79079|110.35380|1|TEGALREJO|/atcs/ATCS_bpk
+151|Malioboro_Mutiara_Lama|-7.79445|110.36562|3|GEDONG TENGEN|/malioboro/Malioboro_8_Mutiara_Lama
+152|Malioboro_Mutiara_Baru|-7.79503|110.36552|3|GEDONG TENGEN|/malioboro/Malioboro_9_Mutiara_Baru
+154|Malioboro_Terang_Bulan|-7.79589|110.36540|3|GEDONG TENGEN|/malioboro/Malioboro_11_Terang_Bulan
+155|Malioboro_Ramayana|-7.79758|110.36515|3|GONDOMANAN|/malioboro/Malioboro_12_Ramayana
+156|Malioboro_Gunungmas|-7.79818|110.36506|3|GONDOMANAN|/malioboro/Malioboro_13_Gunungmas
+157|Simpang Jogokariyan V. Selatan|-7.82468|110.36773|1|MERGANGSAN|/atcs/ATCS_jogokaryan
+159|Simpang APPI - JL.Mentri Supeno|-7.81617|110.38319|1|UMBULHARJO|/atcs/ATCS_Lampu_Merah_JlMentriSupeno
+160|Simpang Kiai Mojo 1 (Barat)|-7.78273|110.35791|1|JETIS|/atcs/ATCS_Lampu_Merah_KyaiMojo
+161|Simpang Kiai Mojo 2 (Timur)|-7.78269|110.35799|1|JETIS|/atcs/ATCS_Lampu_Merah_KyaiMojo2
+163|Simpang Pingit 1 - Jl.Tentara Pelajar|-7.78273|110.36065|1|JETIS|/atcs/ATCS_Lampu_Merah_Pingit1
+164|Simpang Pingit 2 - Jl. Tentara Pelajar|-7.78291|110.36073|1|JETIS|/atcs/ATCS_Lampu_Merah_Pingit2
+165|Simpang Pingit 3 - Jl. Tentara Pelajar|-7.78299|110.36066|1|JETIS|/atcs/ATCS_Lampu_Merah_Pingit3
+166|Simpang Gambiran 1 - Jl.Veteran|-7.81439|110.39169|1|UMBULHARJO|/atcs/ATCS_Lampu_Merah_Gambiran1
+167|Simpang Gambiran 2 - Jl.Veteran|-7.81441|110.39164|1|UMBULHARJO|/atcs/ATCS_Lampu_Merah_Gambiran2
+168|Simpang APPI 2 - Jl.Mentri Supeno|-7.81674|110.38414|1|UMBULHARJO|/atcs/ATCS_Lampu_Merah_JlMentriSupeno2
+169|Simpang Karang Tunggal (S3 Jl. Kol.Sugiyono - Jl. Sisingamangaraja) 1|-7.81519|110.37321|1|MERGANGSAN|/atcs/ATCS_Lampu_Merah_SopMerah1
+170|Simpang Karang Tunggal (S3 Jl. Kol.Sugiyono - Jl. Sisingamangaraja) 2|-7.81517|110.37314|1|MERGANGSAN|/atcs/ATCS_Lampu_Merah_SopMerah2
+171|Simpang Jokteng Wetan - Jl. Parangtritis (PTZ)|-7.81458|110.36835|1||/atcs/ATCS_Lampu_Merah_JoktengWetan
+174|Simpang Sugeng Jeroni 1 - Jl.Sugeng Jeroni|-7.81196|110.34951|1|WIROBRAJAN|/atcs/ATCS_Lampu_Merah_SugengJeroni1
+175|Simpang Sugeng Jeroni 2 - Jl.Sugeng Jeroni|-7.81193|110.34949|1|WIROBRAJAN|/atcs/ATCS_Lampu_Merah_SugengJeroni2
+176|Parkiran Ngabean|-7.80130|110.35624|1|NGAMPILAN|/atcs/ATCS_Parkiran_Ngabean
+177|Simpang Pingit 4 - Jl. Tentara Pelajar|-7.78290|110.36083|1|JETIS|/atcs/ATCS_Lampu_Merah_Pingit4
+178|Simpang Mirota (PTZ)|-7.77609|110.37438|1|GONDOKUSUMAN|/atcs/ATCS_mirota
+179|Simpang Taman Sari (PTZ)|-7.80866|110.35601|1|MANTRIJERON|/atcs/ATCS_tamansari
+195|RTHP Klitren 2|-7.78075|110.38662|9|GONDOKUSUMAN|/rthp/rthp_klitren_2
+198|RTHP Brontokusuman (blkg Kel) 1|-7.82298|110.36959|9|MERGANGSAN|/rthp/rthp_brontokusuman_blkgKel_1
+199|RTHP Brontokusuman (blkg Kel) 2|-7.82309|110.36960|9|MERGANGSAN|/rthp/rthp_brontokusuman_blkgKel_2
+201|RTHP Segoro Amarto Tegalrejo 2|-7.79045|110.34969|9|TEGALREJO|/rthp/rthp_segoro_amarto_tegalrejo_2
+202|RTHP Pakudaya Pakuncen 1|-7.79790|110.35138|9|WIROBRAJAN|/rthp/rthp_pakudaya_pakuncen_1
+203|RTHP Pakudaya Pakuncen 2|-7.79794|110.35136|9|WIROBRAJAN|/rthp/rthp_pakudaya_pakuncen_2
+204|Simpang Amongrogo View Timur|-7.79740|110.38367|1|UMBULHARJO|/atcs/ATCS_Simpang_Amongrogo_View_Timur
+205|Simpang Demangan View Utara|-7.78301|110.38772|1|GONDOKUSUMAN|/atcs/ATCS_Simpang_Demangan_View_Utara
+206|Simpang Demangan View Selatan|-7.78321|110.38802|1|GONDOKUSUMAN|/atcs/ATCS_Simpang_Demangan_View_Selatan
+207|Simpang Demangan View Timur|-7.78311|110.38792|1||/atcs/ATCS_Simpang_Demangan_View_Timur
+227|Simpang DeBritto View Utara|-7.78321|110.39224|1|DEPOK|/atcs/ATCS_Simpang_DeBritto_View_Utara
+228|Simpang Terban View Utara|-7.78278|110.37227|1|GONDOKUSUMAN|/atcs/ATCS_Simpang_Terban_View_Utara
+232|Simpang Rejowinangun View Timur|-7.81071|110.40206|1|KOTAGEDE|/atcs/ATCS_Simpang_Rejowinangun_View_Timur
+233|Simpang Balaikota View Timur|-7.79952|110.39235|1|UMBULHARJO|/atcs/ATCS_Simpang_Balaikota_View_Utara
+234|Simpang Balaikota View Utara-Barat|-7.79962|110.39230|1|UMBULHARJO|/atcs/ATCS_Simpang_Balaikota_View_Timur
+236|Malioboro_Simpang_Reksobayan|-7.79971|110.36487|3|GONDOMANAN|/malioboro/Malioboro_24_Simpang_Reksobayan
+237|Simpang Gedongkuning (PTZ)|-7.80173|110.40141|1|BANGUNTAPAN|/atcs/ATCS_Gedongkuning
+241|Simpang Terban View Timur|-7.78284|110.37217|1|GONDOKUSUMAN|/atcs/ATCS_Simpang_Terban_View_Timur
+242|Simpang Terban View Barat|-7.78283|110.37236|1|GONDOKUSUMAN|/atcs/ATCS_Simpang_Terban_View_Barat
+243|Pasar Demangan View Selatan|-7.78094|110.38818|1|GONDOKUSUMAN|/atcs/ATCS_Pasar_Demangan_View_Selatan
+244|Simpang Galeria (PTZ)|-7.78299|110.37923|1|GONDOKUSUMAN|/atcs/ATCS_Simpang_Galeria_TimurSelatan
+245|Nol Km. - Utara|-7.80124|110.36492|3|GONDOMANAN|/malioboro/NolKm_Utara
+246|Nol Km. - Timur|-7.80131|110.36493|3||/malioboro/NolKm_Timur
+247|Nol Km. - Gd. Agung|-7.80103|110.36495|3|GONDOMANAN|/malioboro/NolKm_GdAgung
+248|Simpang Gramedia (PTZ)|-7.78286|110.37481|1|GONDOKUSUMAN|/atcs/ATCS_Gramedia_2
+249|Simpang Jati Kencana (PTZ)|-7.78172|110.35258|1|TEGALREJO|/atcs/ATCS_Simpang_JatiKencana
+250|Simpang Borobudur Plaza|-7.77838|110.36106|1|TEGALREJO|/atcs/ATCS_Simpang_Borobudur_Plaza
+251|Simpang Tugu (PTZ)|-7.78290|110.36698|1|JETIS|/atcs/ATCS_Simpang_Tugu
+273|Simpang Bausasran (PTZ)|-7.79683|110.37260|1|DANUREJAN|/atcs/ATCS_S4_Bausasran
+275|Simpang Pingit 5 (PTZ)|-7.78221|110.35930|1|JETIS|/atcs/ATCS_Lampu_Merah_Pingit5
+323|Gerbang Masuk Utara V. Timur (Luar)|-7.79926|110.39086|12|UMBULHARJO|/balaikota/Balaikota_Gerbang_Masuk_Utara_View_Timur-Luar
+324|Gerbang Timur PKK V. Utara (Luar)|-7.80035|110.39219|12|UMBULHARJO|/balaikota/Balaikota_Gerbang_Timur_PKK_View_Utara-Luar
+325|Gerbang Timur PKK V. Selatan (Luar)|-7.80052|110.39218|12|UMBULHARJO|/balaikota/Balaikota_Gerbang_Timur_PKK_View_Selatan-Luar
+326|Malioboro_Utara_Mall|-7.79260|110.36593|3|DANUREJAN|/malioboro/Malioboro_25_Utara_Mall
+327|Malioboro_Utara_Inna_Malioboro|-7.79020|110.36625|3|DANUREJAN|/malioboro/Malioboro_21_Utara_Inna_Malioboro
+360|Simpang Balaikota (PTZ)|-7.79968|110.39227|1||/atcs/ATCS_Simpang_Balaikota_PTZ
+361|Simpang Mandala Krida (PTZ)|-7.79769|110.38499|1||/atcs/ATCS_Simpang_Mandala_Krida_PTZ
+362|Simpang Basen|-7.82047|110.40082|1|KOTAGEDE|/atcs/ATCS_Simpang_Basen
+368|Simpang Melia Purosani (PTZ)|-7.79673|110.36911|1||/atcs/ATCS_Simpang_Melia_Purosani
+369|Simpang Patangpuluhan (PTZ)|-7.80786|110.35039|1||/atcs/ATCS_Simpang_Patangpuluhan
+370|Simpang Atmosukarto (PTZ)|-7.78826|110.37833|1||/atcs/ATCS_Simpang_Atmosukarto
+371|Simpang Gondomanan View Selatan|-7.80156|110.36928|1||/atcs/ATCS_Simpang_Gondomanan_View_Selatan
+396|Simpang Pasar Telo View Selatan|-7.82409|110.37324|1||/atcs/ATCS_Simpang_Pasar_Telo_View_Selatan
+397|Simpang Pasar Telo View Utara|-7.82400|110.37328|1||/atcs/ATCS_Simpang_Pasar_Telo_View_Utara
+398|Simpang Gambiran View Timur|-7.81798|110.39079|1||/atcs/ATCS_Simpang_Gambiran_View_Timur
+399|Simpang Gambiran View Barat|-7.81802|110.39070|1||/atcs/ATCS_Simpang_Gambiran_View_Barat
+428|Utara Jl. Gowongan Lor|-7.78547|110.36665|33||/margo-utomo/Gowongan-Lor
+429|Optic Tugu|-7.78761|110.36636|33||/margo-utomo/Optic-Tugu
+430|Selatan Olive|-7.78675|110.36645|33||/margo-utomo/Selatan-Olive
+431|Selatan Tugu|-7.78363|110.36684|33||/margo-utomo/Toko-Cat-Wahyu
+432|Wijaya Baru Travel|-7.78623|110.36651|33||/margo-utomo/Wijaya-Baru-Travel
+434|Jl. Nyoman Oka (Gereja Kotabaru)|-7.78790|110.37133|34|GONDOKUSUMAN|/kotabaru/Jl-Nyoman-Oka
+435|Jl. Sajiono (Roemi)|-7.78559|110.37427|34|GONDOKUSUMAN|/kotabaru/Jl-Sajiono
+436|Jl. Yos Sudarso (Mie Gacoan)|-7.78816|110.37492|34|GONDOKUSUMAN|/kotabaru/ANPR-Jl-Yos-Sudarso
+437|Jl. Wardhani (Selatan-Timur SMPN 5)|-7.78732|110.37538|34|GONDOKUSUMAN|/kotabaru/ANPR-Jl-Wardhani
+439|Jl. Ahmad Jazuli (Apotek K24)|-7.78919|110.36967|34|GONDOKUSUMAN|/kotabaru/ANPR-Jl-Ahmad-Jazuli
+440|Jl. F.M. Noto (Raminten)|-7.78499|110.37160|34|GONDOKUSUMAN|/kotabaru/ANPR-Jl-FM-Noto-Raminten
+441|Jl. F.M. Noto (Gardu ANIEM)|-7.78683|110.37217|34|GONDOKUSUMAN|/kotabaru/ANPR-Jl-FM-Noto-Gardu-Aniem
+443|Jl. Juadi (Pojok Utara-Barat Telkom)|-7.78582|110.37457|34|GONDOKUSUMAN|/kotabaru/Jl-Juadi
+444|Jl. F.M. Noto (McDonalds)|-7.78297|110.37138|34|GONDOKUSUMAN|/kotabaru/ANPR-Jl-FM-Noto-McDonalds
+448|KemMJ-Timur Kemantren|-7.82075|110.36178|35|MANTRIJERON|/kecamatan/KemMJ-TimurKemantren
+449|KemMJ-Pendopo Kemantren|-7.82083|110.36170|35|MANTRIJERON|/kecamatan/KemMJ-PendopoKemantren
+450|KemMJ-Jalan Selatan Kemantren|-7.82077|110.36170|35|MANTRIJERON|/kecamatan/KemMJ-JalanSelatanKemantren
+466|Simpang Wirosaban View Selatan|-7.82467|110.37842|1|UMBULHARJO|/atcs/ATCS_Simpang_Wirosaban_View_Selatan
+467|Simpang Wirosaban View Utara|-7.82455|110.37836|1|UMBULHARJO|/atcs/ATCS_Simpang_Wirosaban_View_Utara
+468|Simpang Wirosaban View Barat|-7.82460|110.37830|1|UMBULHARJO|/atcs/ATCS_Simpang_Wirosaban_View_Barat
+469|Simpang Wirosaban View Timur|-7.82459|110.37846|1|UMBULHARJO|/atcs/ATCS_Simpang_Wirosaban_View_Timur
+477|Simpang Jogokariyan V. Utara|-7.82463|110.36762|1||/atcs/ATCS_Simpang_Jogokariyan_View_Utara
+518|RTHP Gajah Wong Edu Park 3|-7.81767|110.39351|9|UMBULHARJO|/rthp/rthp_gajahwong_edupark_3
+519|RTHP Gajah Wong Edu Park 2|-7.81751|110.39358|9|UMBULHARJO|/rthp/rthp_gajahwong_edupark_2
+520|RTHP Gajah Wong Edu Park 1|-7.81749|110.39348|9|UMBULHARJO|/rthp/rthp_gajahwong_edupark_1
+522|Simpang Tegalgendu V. Selatan|-7.82572|110.39001|1|UMBULHARJO|/atcs/ATCS_Simpang_Tegalgendu
+523|Simpang Letjen Suprapto-KS. Tubun V. Selatan|-7.79739|110.35645|1|NGAMPILAN|/atcs/ATCS_Simpang_Letjen_Suprapto_KS_Tubun_View_Selatan
+524|Simpang Letjen Suprapto-KS. Tubun V. Utara|-7.79729|110.35642|1|NGAMPILAN|/atcs/ATCS_Simpang_Letjen_Suprapto_KS_Tubun_View_Utara
+525|Simpang Glagahsari (PTZ)|-7.80178|110.38907|1|UMBULHARJO|/atcs/ATCS_Glagahsari_PTZ
+755|Simpang Gramedia V. Utara-Timur|-7.78263|110.37466|1|GONDOKUSUMAN|/atcs/ATCS_gramedia
+797|Jl. Mas Suharto V. Selatan (Depan LASERCOM)|-7.79320|110.37106|1|DANUREJAN|/tps-liar/S3_Jl_Mas%20Suharto-Jl_Tegalpanggung
+798|Jl. Mas Suharto V. Utara (Barat Sari Wangi Parfum)|-7.79325|110.37159|1|DANUREJAN|/tps-liar/S3_Jl_Mas%20Suharto-Jl_Tukangan
+816|RTHP Jopraban 3|-7.80278|110.35167|9|WIROBRAJAN|/rthp/rthp_jopraban_3
+817|RTHP Jopraban 2|-7.80278|110.35160|9|WIROBRAJAN|/rthp/rthp_jopraban_2
+818|RTHP Jopraban 1|-7.80272|110.35153|9|WIROBRAJAN|/rthp/rthp_jopraban_1
+829|Simpang Demangan View Timur|-7.78307|110.38786|1|GONDOKUSUMAN|/atcs/ATCS_Simpang_Demangan_View_Timur
+839|RTHP Bumen|-7.82650|110.40352|9|KOTAGEDE|/rthp/rthp_bumen
+842|Depan DPRD V. Utara|-7.79697|110.39246|195|UMBULHARJO|/dprd-kota/depan-dprd-v-utara
+843|Depan DPRD V. Selatan|-7.79715|110.39245|195|UMBULHARJO|/dprd-kota/depan-dprd-v-selatan
+844|Depan DPRD Pos Security|-7.79706|110.39234|195|UMBULHARJO|/dprd-kota/depan-dprd-pos-security
+850|Simpang Pasar Telo (PTZ)|-7.82381|110.37315|1|MERGANGSAN|/atcs/ATCS_Pasar_Telo_PTZ
+856|Simpang Gramedia V. Timur|-7.78281|110.37479|34|GONDOKUSUMAN|/kotabaru/ANPR-Simpang-Gramedia-V-Timur_Ex-Jl-Prau
+873|Simpang Mantrigawen (PTZ)|-7.80896|110.36902|1|MERGANGSAN|/atcs/ATCS_Mantrigawen_PTZ
+874|Utara-Timur Gardena (Jl. Urip Sumoharjo) V. Timur|-7.78282|110.38125|1|GONDOKUSUMAN|/atcs/ATCS_Utara-Timur_Gardena_Jl_Urip%20Sumoharjo_V_Timur
+896|Simpang Mirota V. Barat (FIX)|-7.77599|110.37433|1|GONDOKUSUMAN|/atcs/ATCS_Simpang_Mirota_View_Barat
+900|Simpang Jati Kencana V. Barat|-7.78145|110.35251|1|TEGALREJO|/atcs/ATCS_Simpang_JatiKencana_Fix

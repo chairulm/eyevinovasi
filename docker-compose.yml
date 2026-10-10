@@ -1,0 +1,20 @@
+services:
+  cctv-map:
+    build: .
+    ports: ["8080:8080"]
+    environment:
+      REFRESH_HOURS: "12"     # re-scrape camera lists
+      HEALTH_MINUTES: "30"    # re-probe stream playlists
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+
+  # Optional: continuous frame capture for analytics (1 frame / 60 s / camera)
+  grabber:
+    build: .
+    command: ["python", "-m", "analytics.frame_grabber", "--interval", "60", "--workers", "4"]
+    volumes:
+      - ./data:/app/data
+    depends_on: [cctv-map]
+    profiles: ["analytics"]
+    restart: unless-stopped

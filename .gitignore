@@ -1,0 +1,18 @@
+# generated at runtime (rebuilt from data/seed/ or a live scrape)
+data/cameras.json
+data/cameras.geojson
+web/cameras.geojson
+data/frames/
+data/analytics/
+
+# python / env
+__pycache__/
+*.pyc
+.venv/
+.env
+
+# os / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
