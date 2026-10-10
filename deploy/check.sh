@@ -27,6 +27,16 @@ if curl -sf --max-time 5 http://127.0.0.1:8080/api/stats >/tmp/cctv_stats; then 
 code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1/)
 [[ $code == 200 || $code == 401 ]] && ok "nginx :80 -> HTTP $code" || bad "nginx :80 -> HTTP $code"
 
+if [[ -f /etc/cctv-map/deploy.conf ]]; then
+  D=$(sed -n 's/^DOMAIN=//p' /etc/cctv-map/deploy.conf)
+  if [[ -n "$D" ]]; then
+    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "https://$D/")
+    [[ $code == 200 || $code == 401 ]] && ok "https://$D -> HTTP $code" || bad "https://$D -> HTTP $code (certificate or DNS problem?)"
+    exp=$(echo | openssl s_client -connect 127.0.0.1:443 -servername "$D" 2>/dev/null | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)
+    [[ -n "$exp" ]] && echo "  certificate expires: $exp (auto-renewed by certbot.timer)"
+  fi
+fi
+
 sec "Database"
 h=$(curl -s --max-time 5 http://127.0.0.1:8080/api/v1/health)
 if grep -q '"backend":"postgres"' <<<"$h"; then ok "API backend: $h"; else bad "API not on Postgres: $h"; fi

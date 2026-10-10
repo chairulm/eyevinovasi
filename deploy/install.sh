@@ -5,6 +5,7 @@
 #   sudo bash deploy/install.sh --auth                # + password-protect the site (prompts once;
 #                                                     #   stays on for later re-runs, --no-auth removes)
 #   sudo bash deploy/install.sh --domain cctv.example.com --email you@example.com   # + HTTPS
+#                                                     #   (remembered for later re-runs; --no-domain drops it)
 #
 # Layout:  /opt/cctv-map (code, venv)   /opt/cctv-map/data (cameras, frames — kept on update)
 # Services: cctv-map (uvicorn :8080, localhost only) behind nginx :80/:443
@@ -22,12 +23,25 @@ while [[ $# -gt 0 ]]; do
     --domain) DOMAIN="$2"; shift 2 ;;
     --email)  EMAIL="$2";  shift 2 ;;
     --auth)   AUTH=1;      shift ;;
+    --no-domain) DOMAIN="-"; shift ;;
     --no-auth) AUTH=-1;    shift ;;
     *) echo "unknown option: $1"; exit 1 ;;
   esac
 done
 
 [[ $EUID -eq 0 ]] || { echo "Run with sudo"; exit 1; }
+
+# domain + email are remembered so later re-runs keep HTTPS (use --no-domain to drop it)
+DEPLOY_CONF=/etc/cctv-map/deploy.conf
+if [[ -f $DEPLOY_CONF ]]; then
+  SAVED_DOMAIN=$(sed -n 's/^DOMAIN=//p' "$DEPLOY_CONF"); SAVED_EMAIL=$(sed -n 's/^EMAIL=//p' "$DEPLOY_CONF")
+  [[ -z "$DOMAIN" ]] && DOMAIN="$SAVED_DOMAIN"
+  [[ -z "$EMAIL" ]] && EMAIL="$SAVED_EMAIL"
+fi
+[[ "$DOMAIN" == "-" ]] && DOMAIN="" && EMAIL=""
+if [[ -n "$DOMAIN" && -z "$EMAIL" ]]; then echo "--domain needs --email (for Let's Encrypt expiry notices)"; exit 1; fi
+mkdir -p /etc/cctv-map
+printf 'DOMAIN=%s\nEMAIL=%s\n' "$DOMAIN" "$EMAIL" > "$DEPLOY_CONF"
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 [[ -f "$SRC_DIR/server/app.py" ]] || { echo "Run from inside the repo folder (deploy/install.sh)"; exit 1; }
 log() { echo -e "\n\e[1;34m==>\e[0m $*"; }
@@ -260,7 +274,8 @@ systemctl restart cctv-map
 if [[ -n "$DOMAIN" && -n "$EMAIL" ]]; then
   log "HTTPS for $DOMAIN (DNS A record must already point to this VM)"
   apt-get install -y certbot python3-certbot-nginx
-  certbot --nginx -d "$DOMAIN" -m "$EMAIL" --agree-tos --redirect -n || \
+  # re-runs keep the existing certificate and re-apply it to the freshly written nginx config
+  certbot --nginx -d "$DOMAIN" -m "$EMAIL" --agree-tos --redirect --keep-until-expiring -n || \
     echo "!! certbot failed — check DNS, then re-run this script"
 fi
 
@@ -268,7 +283,7 @@ sleep 3
 IP=$(hostname -I | awk '{print $1}')
 log "Done"
 curl -s http://127.0.0.1:8080/api/stats && echo
-echo "Open:  http://${DOMAIN:-$IP}/"
+if [[ -n "$DOMAIN" ]]; then echo "Open:  https://$DOMAIN/   (or http://$IP/)"; else echo "Open:  http://$IP/"; fi
 echo "Logs:  journalctl -u cctv-map -f"
 echo "Check: sudo bash $APP_DIR/deploy/check.sh"
 echo "Analytics frame capture (optional): sudo systemctl enable --now cctv-grabber"
