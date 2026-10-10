@@ -99,6 +99,9 @@ Migrations: add `db/migrations/NNN_name.sql`. They're applied in order by `pytho
 - The player tries the re-stream first, then the `/hls` proxy, then a direct connection from the browser.
 
 The config (`data/mediamtx.yml`) is regenerated after every scrape, and MediaMTX reloads it automatically.
+**Jogja** streams carry an extra data track that MediaMTX's built-in HLS reader rejects (`unsupported track type: *mpegts.Track`).
+For that source, MediaMTX starts `ffmpeg` on demand, which copies only the video track (no re-encode) and publishes it locally.
+Configure the affected sources with `RESTREAM_FFMPEG_SOURCES` (default `jogja`).
 Sources are HLS, so the 6–10 s upstream delay remains. WebRTC is deliberately off, and no extra ports are opened.
 
 ### Camera schema

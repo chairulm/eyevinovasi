@@ -22,6 +22,13 @@ ROOT = Path(__file__).resolve().parents[1]
 CONFIG = Path(os.getenv("MEDIAMTX_CONFIG", ROOT / "data" / "mediamtx.yml"))
 ENABLED = os.getenv("RESTREAM", "0") == "1"
 LIVE_PREFIX = "/live"
+
+# Sources whose HLS carries extra tracks MediaMTX's native HLS reader rejects
+# (Jogja's Wowza adds an ID3/data track -> "unsupported track type: *mpegts.Track").
+# For these, MediaMTX starts ffmpeg on demand, which copies only the video track
+# (no re-encode) and publishes it locally over RTSP.
+FFMPEG_SOURCES = set(filter(None, os.getenv("RESTREAM_FFMPEG_SOURCES", "jogja").split(",")))
+FFMPEG = os.getenv("FFMPEG_BIN", "ffmpeg")
 log = logging.getLogger("restream")
 
 GLOBAL = """\
@@ -52,11 +59,6 @@ hlsSegmentCount: 7
 hlsSegmentDuration: 1s
 hlsAllowOrigin: '*'
 
-pathDefaults:
-  sourceOnDemand: yes
-  sourceOnDemandStartTimeout: 20s
-  sourceOnDemandCloseAfter: 30s
-
 paths:
 """
 
@@ -82,7 +84,22 @@ def render(cams: list[dict]) -> str:
     for c in sorted(cams, key=lambda x: x["id"]):
         if c.get("playback") != "hls" or not c.get("stream_url"):
             continue
-        out.append(f"  {path_name(c['id'])}:\n    source: {_yaml_str(c['stream_url'])}\n")
+        name = path_name(c["id"])
+        if c.get("source") in FFMPEG_SOURCES:
+            cmd = (f"{FFMPEG} -nostdin -loglevel error -user_agent Mozilla/5.0 "
+                   f"-i {c['stream_url']} -map 0:v:0 -c copy "
+                   f"-f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/$MTX_PATH")
+            out.append(f"  {name}:\n"
+                       f"    runOnDemand: {_yaml_str(cmd)}\n"
+                       f"    runOnDemandRestart: yes\n"
+                       f"    runOnDemandStartTimeout: 25s\n"
+                       f"    runOnDemandCloseAfter: 30s\n")
+        else:
+            out.append(f"  {name}:\n"
+                       f"    source: {_yaml_str(c['stream_url'])}\n"
+                       f"    sourceOnDemand: yes\n"
+                       f"    sourceOnDemandStartTimeout: 25s\n"
+                       f"    sourceOnDemandCloseAfter: 30s\n")
         n += 1
     if not n:
         out.append("  {}\n")
