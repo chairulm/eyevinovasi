@@ -50,19 +50,44 @@ The services are `cctv-map` (app) and `cctv-grabber` (frame capture for analytic
 ## Architecture
 
 ```
-collector/            per-source scrapers → one Camera schema → cameras.json / .geojson
+collector/            per-source scrapers → one Camera schema → database (+ cameras.json export)
+db/                   Postgres schema migrations (db/migrations/*.sql), store with JSON fallback
   sources/medan.py    API + runtime credential discovery
   sources/jogja.py    JSON endpoint
   sources/binamarga.py  inline-JS parse, play-page → m3u8 resolution, Kemenhub resolver
   health.py           fetches each .m3u8 playlist only (few KB), never video segments
-server/app.py         FastAPI: /api/cameras, /api/resolve/{id}, /api/refresh,
+server/app.py         FastAPI: versioned API /api/v1/* (legacy /api/* kept), see below,
                       /hls?u=…  HLS reverse proxy (CORS + Referer + mixed-content fix,
                       host allow-list, playlist URI rewriting)
 web/                  Leaflet + markercluster + hls.js (vendored, no CDN needed)
 analytics/            frame_grabber.py (ffmpeg, 1 frame/interval) → vehicle_count.py (YOLO example)
 ```
 
-### Camera schema (`data/cameras.json`)
+### Storage
+
+PostgreSQL 16 (installed by `deploy/install.sh`, database `cctvmap`). The app connects over the local socket with peer auth, so no password is stored anywhere.
+If `DATABASE_URL` isn't set, or the database is down, the app falls back to `data/cameras.json`.
+
+| Table | Purpose |
+|---|---|
+| `cameras` | one row per camera; `active=false` when a live scrape no longer lists it (soft delete) |
+| `camera_status_log` | one row per online/offline **change**, which is the basis for uptime history |
+| `collector_runs` | every scrape: source, live/seed, count, added/removed, error |
+
+Migrations: add `db/migrations/NNN_name.sql`. They're applied in order by `python -m db.migrate`, which the installer runs.
+
+### API v1
+
+| Endpoint | Notes |
+|---|---|
+| `GET /api/v1/cameras` | GeoJSON. Filters: `source=medan,jogja`, `status=online`, `bbox=minLon,minLat,maxLon,maxLat`, `include_inactive=1` |
+| `GET /api/v1/cameras/{id}` | camera + `status_log` (recent changes) |
+| `GET /api/v1/stats` | counts + last collector runs |
+| `GET /api/v1/health` | backend (postgres/json) and schema version |
+| `GET /api/v1/resolve/{id}` | fresh player URL for tokenised sources |
+| `POST /api/v1/refresh` | re-scrape + health check in background |
+
+### Camera schema
 
 `id` (stable, e.g. `medan:25`, `jogja:14`, `binamarga:its-CT-01`) · `source` · `name` · `lat`/`lon` ·
 `geo_source` (source|approx|none) · `playback` (hls|resolve|external) · `stream_url` · `page_url` ·

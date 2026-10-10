@@ -13,7 +13,7 @@ echo "  CPU $(nproc) | RAM $(free -h | awk '/Mem/ {print $3"/"$2}') | Disk $(df 
 echo "  IPs: $(hostname -I) | TZ: $(timedatectl show -p Timezone --value 2>/dev/null)"
 
 sec "Services"
-for s in cctv-map nginx fail2ban cctv-grabber; do
+for s in cctv-map nginx postgresql fail2ban cctv-grabber; do
   st=$(systemctl is-active $s 2>/dev/null); en=$(systemctl is-enabled $s 2>/dev/null)
   [[ $st == active ]] && ok "$s ($en)" || echo "  [--]   $s: $st ($en)"
 done
@@ -26,6 +26,20 @@ sec "App API"
 if curl -sf --max-time 5 http://127.0.0.1:8080/api/stats >/tmp/cctv_stats; then ok "API: $(cat /tmp/cctv_stats)"; else bad "API not responding on 127.0.0.1:8080"; fi
 code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1/)
 [[ $code == 200 || $code == 401 ]] && ok "nginx :80 -> HTTP $code" || bad "nginx :80 -> HTTP $code"
+
+sec "Database"
+h=$(curl -s --max-time 5 http://127.0.0.1:8080/api/v1/health)
+if grep -q '"backend":"postgres"' <<<"$h"; then ok "API backend: $h"; else bad "API not on Postgres: $h"; fi
+sudo -u postgres psql -d cctvmap -qtA -F ' | ' -c "
+  SELECT 'active cameras', count(*) FILTER (WHERE active)::text FROM cameras
+  UNION ALL SELECT 'retired cameras', count(*) FILTER (WHERE NOT active)::text FROM cameras
+  UNION ALL SELECT 'status changes logged', count(*)::text FROM camera_status_log
+  UNION ALL SELECT 'db size', pg_size_pretty(pg_database_size('cctvmap'))" 2>/dev/null | sed 's/^/  /'
+echo "  last collector runs:"
+sudo -u postgres psql -d cctvmap -qtA -F ' | ' -c "
+  SELECT to_char(started_at AT TIME ZONE 'Asia/Jakarta','MM-DD HH24:MI'), source, mode, cameras,
+         '+'||added||' -'||removed, coalesce(left(error,60),'')
+  FROM collector_runs ORDER BY id DESC LIMIT 6" 2>/dev/null | sed 's/^/    /'
 
 sec "Camera data"
 [[ -f $APP_DIR/data/cameras.json ]] && echo "  cameras.json updated $(date -r $APP_DIR/data/cameras.json '+%F %T')"

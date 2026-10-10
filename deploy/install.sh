@@ -13,6 +13,9 @@ set -euo pipefail
 
 APP_DIR=/opt/cctv-map
 APP_USER=cctv
+DB_NAME=cctvmap
+# peer auth over the local socket: the "cctv" OS user logs in as DB role "cctv" — no password
+DB_URL="postgresql:///$DB_NAME"
 DOMAIN=""; EMAIL=""; AUTH=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -34,7 +37,7 @@ log "Installing packages"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
 apt-get install -y --no-install-recommends \
-  python3 python3-venv python3-pip ffmpeg nginx ufw fail2ban apache2-utils \
+  python3 python3-venv python3-pip ffmpeg nginx ufw fail2ban apache2-utils postgresql \
   rsync curl unzip ca-certificates unattended-upgrades
 timedatectl set-timezone Asia/Jakarta || true
 
@@ -51,13 +54,22 @@ python3 -m venv "$APP_DIR/.venv"
 "$APP_DIR/.venv/bin/pip" install -q -r "$APP_DIR/requirements.txt"
 chown -R "$APP_USER:$APP_USER" "$APP_DIR"
 
+# ------------------------------------------------------------------ database
+log "PostgreSQL: role, database, migrations"
+systemctl enable --now postgresql
+sudo -u postgres psql -qtAc "SELECT 1 FROM pg_roles WHERE rolname='$APP_USER'" | grep -q 1 || \
+  sudo -u postgres psql -qc "CREATE ROLE $APP_USER LOGIN"
+sudo -u postgres psql -qtAc "SELECT 1 FROM pg_database WHERE datname='$DB_NAME'" | grep -q 1 || \
+  sudo -u postgres psql -qc "CREATE DATABASE $DB_NAME OWNER $APP_USER"
+sudo -u "$APP_USER" env DATABASE_URL="$DB_URL" bash -c "cd $APP_DIR && .venv/bin/python -m db.migrate"
+
 # ------------------------------------------------------------------ systemd
 log "Installing systemd services"
 cat > /etc/systemd/system/cctv-map.service <<EOF
 [Unit]
 Description=CCTV Map (FastAPI)
-After=network-online.target
-Wants=network-online.target
+After=network-online.target postgresql.service
+Wants=network-online.target postgresql.service
 
 [Service]
 User=$APP_USER
@@ -66,6 +78,7 @@ WorkingDirectory=$APP_DIR
 Environment=REFRESH_HOURS=12
 Environment=HEALTH_MINUTES=30
 Environment=PYTHONUNBUFFERED=1
+Environment=DATABASE_URL=$DB_URL
 ExecStart=$APP_DIR/.venv/bin/uvicorn server.app:app --host 127.0.0.1 --port 8080 --proxy-headers --workers 1
 Restart=always
 RestartSec=5
@@ -73,7 +86,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=$APP_DIR/data $APP_DIR/web
+ReadWritePaths=$APP_DIR/data $APP_DIR/web /run/postgresql
 
 [Install]
 WantedBy=multi-user.target
@@ -182,7 +195,7 @@ systemctl enable --now fail2ban
 # ------------------------------------------------------------------ first data load
 log "Live scrape + stream health check (can take 3-8 min)"
 systemctl stop cctv-map 2>/dev/null || true
-sudo -u "$APP_USER" bash -c "cd $APP_DIR && timeout 1200 .venv/bin/python -m collector.run --health" || \
+sudo -u "$APP_USER" env DATABASE_URL="$DB_URL" bash -c "cd $APP_DIR && timeout 1200 .venv/bin/python -m collector.run --health" || \
   echo "!! live scrape had errors — app will use seed data; see output above"
 
 systemctl daemon-reload

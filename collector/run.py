@@ -1,4 +1,4 @@
-"""Collect cameras from all sources -> data/cameras.json + data/cameras.geojson
+"""Collect cameras from all sources -> database (if DATABASE_URL) + data/cameras.json/.geojson
 
   python -m collector.run                 # live scrape all sources, seed fallback per source
   python -m collector.run --seed-only     # build from data/seed/*.psv (offline)
@@ -10,9 +10,10 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
-from .common import load_cameras, write_outputs
+from .common import load_cameras
 from .health import probe_all
 from .sources import REGISTRY
 
@@ -30,17 +31,19 @@ def collect(only=None, seed_only=False, health=False) -> list:
         except Exception:
             prev = {}
 
-    cams = []
+    cams, runs = [], {}
     for name, mod in REGISTRY.items():
         if only and name not in only:
             cams += [c for c in prev.values() if c.source == name]
             continue
+        run = runs[name] = {"started_at": datetime.now(timezone.utc), "mode": "seed", "error": None}
         got, how = [], "seed"
         if not seed_only:
             try:
                 got, how = mod.fetch(), "live"
             except Exception as e:  # network/layout change -> keep going with seed
                 log.warning("%s live fetch failed: %s — using seed", name, e)
+                run["error"] = f"{type(e).__name__}: {e}"[:500]
         seed = SEED / f"{name}.psv"
         if not got:
             got = mod.from_seed(seed) if seed.exists() else []
@@ -59,6 +62,7 @@ def collect(only=None, seed_only=False, health=False) -> list:
             if c.id in prev and c.status == "unknown":
                 c.status, c.last_checked = prev[c.id].status, prev[c.id].last_checked
         log.info("%-10s %4d cameras (%s)", name, len(got), how)
+        run.update(mode=how if got else "none", cameras=len(got))
         cams += got
 
     # de-duplicate on id (keep first)
@@ -70,9 +74,22 @@ def collect(only=None, seed_only=False, health=False) -> list:
 
     if health:
         probe_all(uniq)
-    write_outputs(uniq, DATA)
-    log.info("wrote %d cameras -> %s", len(uniq), DATA / "cameras.geojson")
+    from db.store import get_store  # late import: db.store imports collector.common
+    store = get_store()
+    store.persist(uniq, runs)
+    log.info("saved %d cameras (%s store)", len(uniq), store.kind)
     return uniq
+
+
+def health_only() -> list:
+    """Re-probe the current camera list without re-scraping the sources."""
+    from db.store import cameras_from_store, get_store
+    store = get_store()
+    cams = cameras_from_store(store) or (
+        load_cameras(DATA / "cameras.json") if (DATA / "cameras.json").exists() else [])
+    probe_all(cams)
+    store.persist(cams)
+    return cams
 
 
 def main(argv=None):

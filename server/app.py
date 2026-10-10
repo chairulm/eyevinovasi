@@ -2,14 +2,19 @@
 
   uvicorn server.app:app --host 0.0.0.0 --port 8080
 
-Endpoints
-  GET  /                        map UI (web/)
-  GET  /api/cameras             GeoJSON of all cameras
-  GET  /api/stats               counts per source / status
-  GET  /api/resolve/{cam_id}    fresh player URL for tokenised sources (Kemenhub)
-  GET  /hls?u=<url>             HLS reverse proxy (CORS + mixed-content + Referer fix),
-                                restricted to known camera hosts, rewrites playlists
-  POST /api/refresh             re-run collectors (+ health) in background
+Storage: Postgres when DATABASE_URL is set (see db/), else data/cameras.json.
+
+API v1 (also served at the legacy /api/... paths for compatibility)
+  GET  /api/v1/cameras                 GeoJSON; filters: ?source=medan,jogja &status=online
+                                       &bbox=minLon,minLat,maxLon,maxLat &include_inactive=1
+  GET  /api/v1/cameras/{id}            one camera + recent status changes
+  GET  /api/v1/stats                   counts per source / status (+ last collector runs)
+  GET  /api/v1/health                  backend + database status (for monitoring)
+  GET  /api/v1/resolve/{id}            fresh player URL for tokenised sources (Kemenhub)
+  POST /api/v1/refresh                 re-run collectors (+ health) in background
+Other
+  GET  /hls?u=<url>                    HLS reverse proxy (host allow-list, playlist rewrite)
+  GET  /                               map UI (web/)
 """
 from __future__ import annotations
 
@@ -23,15 +28,14 @@ from pathlib import Path
 from urllib.parse import quote, urljoin, urlparse
 
 import httpx
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import APIRouter, FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from collector.common import RESOLVE, UA, load_cameras
-from collector.health import probe_all
-from collector.common import write_outputs
-from collector.run import collect
+from collector.common import RESOLVE, UA
+from collector.run import collect, health_only
 from collector.sources import binamarga
+from db.store import get_store
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
@@ -49,24 +53,19 @@ ALLOWED_HOSTS = {
     "apps.ptbtu.com": "https://binamarga.pu.go.id/cctv-non-tol",
 }
 
-app = FastAPI(title="CCTV Map")
+app = FastAPI(title="Eyevinovasi CCTV Map", version="1.0")
+api = APIRouter()
 _lock = threading.Lock()
 _http: httpx.AsyncClient | None = None
-
-
-def _cams():
-    p = DATA / "cameras.json"
-    if not p.exists():
-        collect(seed_only=True)
-    return load_cameras(p)
 
 
 @app.on_event("startup")
 async def _startup():
     global _http
     _http = httpx.AsyncClient(timeout=20, follow_redirects=True, headers={"User-Agent": UA})
-    if not (DATA / "cameras.json").exists():
-        await asyncio.to_thread(collect, None, True, False)
+    store = await asyncio.to_thread(get_store)
+    if not await asyncio.to_thread(store.list_cameras):
+        await asyncio.to_thread(collect, None, True, False)   # first run: seed data
     asyncio.create_task(_scheduler())
 
 
@@ -77,7 +76,7 @@ async def _shutdown():
 
 
 async def _scheduler():
-    """Periodic list refresh + health probes. Runs in-process; swap for cron/k8s CronJob in prod."""
+    """Periodic list refresh + health probes. Runs in-process (single uvicorn worker)."""
     loop = asyncio.get_running_loop()
     next_refresh = loop.time() + 5
     next_health = loop.time() + 60
@@ -86,73 +85,95 @@ async def _scheduler():
         t = loop.time()
         if REFRESH_HOURS > 0 and t >= next_refresh:
             next_refresh = t + REFRESH_HOURS * 3600
-            await asyncio.to_thread(_refresh, True)
+            await asyncio.to_thread(_locked, collect, None, False, True)
         elif HEALTH_MINUTES > 0 and t >= next_health:
             next_health = t + HEALTH_MINUTES * 60
-            await asyncio.to_thread(_health_only)
+            await asyncio.to_thread(_locked, health_only)
 
 
-def _refresh(health: bool):
+def _locked(fn, *args):
     if not _lock.acquire(blocking=False):
         return
     try:
-        collect(health=health)
+        fn(*args)
     except Exception as e:
-        log.exception("refresh failed: %s", e)
+        log.exception("background job failed: %s", e)
     finally:
         _lock.release()
 
 
-def _health_only():
-    if not _lock.acquire(blocking=False):
-        return
-    try:
-        cams = load_cameras(DATA / "cameras.json")
-        probe_all(cams)
-        write_outputs(cams, DATA)
-    finally:
-        _lock.release()
+def _csv(v: str | None) -> list[str] | None:
+    return [x.strip() for x in v.split(",") if x.strip()] if v else None
 
 
-@app.get("/api/cameras")
-def cameras():
-    p = DATA / "cameras.geojson"
-    if not p.exists():
-        _cams()
-    return Response(p.read_text(), media_type="application/geo+json",
+def _feature(c: dict) -> dict:
+    geom = ({"type": "Point", "coordinates": [c["lon"], c["lat"]]}
+            if c.get("lat") is not None and c.get("lon") is not None else None)
+    return {"type": "Feature", "id": c["id"], "geometry": geom, "properties": c}
+
+
+@api.get("/cameras")
+def cameras(source: str | None = None, status: str | None = None, bbox: str | None = None,
+            include_inactive: bool = False):
+    box = None
+    if bbox:
+        try:
+            box = [float(x) for x in bbox.split(",")]
+            assert len(box) == 4
+        except Exception:
+            raise HTTPException(400, "bbox must be minLon,minLat,maxLon,maxLat")
+    cams = get_store().list_cameras(_csv(source), _csv(status), box, include_inactive)
+    body = {"type": "FeatureCollection", "count": len(cams), "features": [_feature(c) for c in cams]}
+    return Response(json.dumps(body, ensure_ascii=False), media_type="application/geo+json",
                     headers={"Cache-Control": "no-cache"})
 
 
-@app.get("/api/stats")
-def stats():
-    cams = _cams()
-    out = {"total": len(cams), "by_source": {}, "by_status": {}, "analytics_ready": 0}
-    for c in cams:
-        out["by_source"][c.source] = out["by_source"].get(c.source, 0) + 1
-        out["by_status"][c.status] = out["by_status"].get(c.status, 0) + 1
-        out["analytics_ready"] += int(c.analytics_ready)
-    return out
-
-
-@app.get("/api/resolve/{cam_id:path}")
-def resolve(cam_id: str):
-    cam = next((c for c in _cams() if c.id == cam_id), None)
+@api.get("/cameras/{cam_id:path}")
+def camera(cam_id: str, history: int = Query(50, ge=0, le=1000)):
+    store = get_store()
+    cam = store.get_camera(cam_id)
     if not cam:
         raise HTTPException(404, "unknown camera")
-    if cam.playback != RESOLVE:
-        return {"url": cam.stream_url or cam.page_url, "kind": cam.playback}
+    return cam | {"status_log": store.status_log(cam_id, history)}
+
+
+@api.get("/stats")
+def stats():
+    store = get_store()
+    return store.stats() | {"backend": store.kind, "last_runs": store.recent_runs(6)}
+
+
+@api.get("/health")
+def health():
     try:
-        return {"url": binamarga.resolve_player(cam.page_url), "kind": "iframe"}
+        return get_store().ping()
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)[:200]}, status_code=503)
+
+
+@api.get("/resolve/{cam_id:path}")
+def resolve(cam_id: str):
+    cam = get_store().get_camera(cam_id)
+    if not cam:
+        raise HTTPException(404, "unknown camera")
+    if cam["playback"] != RESOLVE:
+        return {"url": cam["stream_url"] or cam["page_url"], "kind": cam["playback"]}
+    try:
+        return {"url": binamarga.resolve_player(cam["page_url"]), "kind": "iframe"}
     except Exception as e:
         raise HTTPException(502, f"resolve failed: {e}")
 
 
-@app.post("/api/refresh")
+@api.post("/refresh")
 async def refresh(health: bool = True):
     if _lock.locked():
         return JSONResponse({"status": "already running"}, status_code=409)
-    asyncio.create_task(asyncio.to_thread(_refresh, health))
+    asyncio.create_task(asyncio.to_thread(_locked, collect, None, False, health))
     return {"status": "started"}
+
+
+app.include_router(api, prefix="/api/v1")
+app.include_router(api, prefix="/api", include_in_schema=False)   # legacy paths
 
 
 # ---------------------------------------------------------------- HLS proxy

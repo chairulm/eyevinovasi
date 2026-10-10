@@ -34,7 +34,7 @@
   async function load() {
     let gj;
     try {
-      const r = await fetch("/api/cameras", { cache: "no-store" });
+      const r = await fetch("/api/v1/cameras", { cache: "no-store" });
       if (!r.ok) throw 0;
       gj = await r.json(); state.api = true;
     } catch {
@@ -193,7 +193,7 @@
       const m = msg("Resolving fresh player URL…");
       if (!state.api) { m.innerHTML = `Needs the server (token is short-lived).<br><a style="color:#9cf" href="${esc(c.page_url)}" target="_blank">Open source page ↗</a>`; return; }
       try {
-        const r = await fetch("/api/resolve/" + encodeURIComponent(c.id)); if (!r.ok) throw new Error(r.status);
+        const r = await fetch("/api/v1/resolve/" + encodeURIComponent(c.id)); if (!r.ok) throw new Error(r.status);
         const { url } = await r.json();
         const f = document.createElement("iframe"); f.src = url; f.allow = "autoplay; fullscreen"; f.referrerPolicy = "no-referrer";
         el.insertBefore(f, el.firstChild); m.remove();
@@ -224,7 +224,7 @@
   $("#toggle-side").onclick = () => $("#side").classList.toggle("open");
   $("#refresh").onclick = async (e) => {
     e.target.disabled = true; e.target.textContent = "Refreshing…";
-    try { await fetch("/api/refresh", { method: "POST" }); setTimeout(() => location.reload(), 45000); }
+    try { await fetch("/api/v1/refresh", { method: "POST" }); setTimeout(() => location.reload(), 45000); }
     catch { e.target.disabled = false; e.target.textContent = "Refresh"; }
   };
 
