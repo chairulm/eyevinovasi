@@ -245,7 +245,7 @@ systemctl enable --now fail2ban
 # ------------------------------------------------------------------ first data load
 log "Live scrape + stream health check (can take 3-8 min)"
 systemctl stop cctv-map 2>/dev/null || true
-sudo -u "$APP_USER" env DATABASE_URL="$DB_URL" RESTREAM=1 bash -c "cd $APP_DIR && timeout 1200 .venv/bin/python -m collector.run --health" || \
+sudo -u "$APP_USER" env DATABASE_URL="$DB_URL" RESTREAM=1 bash -c "cd $APP_DIR && timeout 1200 .venv/bin/python -m collector.run --health --progress" || \
   echo "!! live scrape had errors — app will use seed data; see output above"
 
 sudo -u "$APP_USER" env DATABASE_URL="$DB_URL" RESTREAM=1 bash -c "cd $APP_DIR && .venv/bin/python -m restream.config"

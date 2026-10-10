@@ -23,7 +23,8 @@ SEED = DATA / "seed"
 log = logging.getLogger("collector")
 
 
-def collect(only=None, seed_only=False, health=False) -> list:
+def collect(only=None, seed_only=False, health=False, progress=None) -> list:
+    """progress(phase, done, total) — optional callback for a progress display."""
     prev = {}
     if (DATA / "cameras.json").exists():
         try:
@@ -32,9 +33,14 @@ def collect(only=None, seed_only=False, health=False) -> list:
             prev = {}
 
     cams, runs = [], {}
-    for name, mod in REGISTRY.items():
+    n_src = len(REGISTRY)
+    if progress:
+        progress("Collecting camera lists", 0, n_src)
+    for i_src, (name, mod) in enumerate(REGISTRY.items(), 1):
         if only and name not in only:
             cams += [c for c in prev.values() if c.source == name]
+            if progress:
+                progress("Collecting camera lists", i_src, n_src)
             continue
         run = runs[name] = {"started_at": datetime.now(timezone.utc), "mode": "seed", "error": None}
         got, how = [], "seed"
@@ -64,6 +70,8 @@ def collect(only=None, seed_only=False, health=False) -> list:
         log.info("%-10s %4d cameras (%s)", name, len(got), how)
         run.update(mode=how if got else "none", cameras=len(got))
         cams += got
+        if progress:
+            progress("Collecting camera lists", i_src, n_src)
 
     # de-duplicate on id (keep first)
     seen, uniq = set(), []
@@ -73,7 +81,7 @@ def collect(only=None, seed_only=False, health=False) -> list:
             uniq.append(c)
 
     if health:
-        probe_all(uniq)
+        probe_all(uniq, on_progress=(lambda d, t: progress("Checking cameras", d, t)) if progress else None)
     from db.store import get_store  # late import: db.store imports collector.common
     store = get_store()
     store.persist(uniq, runs)
@@ -100,9 +108,39 @@ def main(argv=None):
     ap.add_argument("--seed-only", action="store_true")
     ap.add_argument("--health", action="store_true")
     ap.add_argument("--only", nargs="*")
+    ap.add_argument("--progress", action="store_true",
+                    help="show only a percentage per phase instead of log lines (used by the installer)")
     a = ap.parse_args(argv)
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    collect(a.only, a.seed_only, a.health)
+    logging.basicConfig(level=logging.WARNING if a.progress else logging.INFO,
+                        format="%(asctime)s %(levelname)s %(message)s")
+    cams = collect(a.only, a.seed_only, a.health, progress=_Progress() if a.progress else None)
+    if a.progress:
+        on = sum(1 for c in cams if c.status == "online")
+        off = sum(1 for c in cams if c.status == "offline")
+        print(f"  {len(cams)} cameras: {on} online, {off} offline, {len(cams) - on - off} not checkable")
+
+
+class _Progress:
+    """One updating line per phase on a terminal; 10% steps when output is a log/pipe."""
+
+    def __init__(self):
+        self.tty = sys.stdout.isatty()
+        self.phase, self.last = None, -1
+
+    def __call__(self, phase, done, total):
+        pct = int(100 * done / total) if total else 100
+        if phase != self.phase:
+            if self.phase and self.tty:
+                print()
+            self.phase, self.last = phase, -1
+        if self.tty:
+            print(f"\r  {phase}: {pct:3d}% ({done}/{total})", end="", flush=True)
+            if done >= total:
+                print()
+                self.phase = None
+        elif pct // 10 != self.last // 10 or done >= total:
+            print(f"  {phase}: {pct}% ({done}/{total})", flush=True)
+        self.last = pct
 
 
 if __name__ == "__main__":
